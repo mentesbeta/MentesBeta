@@ -1,0 +1,30 @@
+# Entornos virtuales
+.venv/
+venv/
+
+# Configuración de entorno
+.env
+.env.*
+
+# Archivos temporales
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# Datos y backups
+backups/
+*.sql
+
+# Docker
+*.pid
+*.sock
+mysql_data/
+**/node_modules/
+
+# Archivos de IDEs
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
