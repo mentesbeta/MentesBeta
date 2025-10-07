@@ -28,3 +28,10 @@ mysql_data/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Ignorar backups o dumps accidentales
+/*.sql
+/backups/
+
+# Pero incluir las migraciones del proyecto
+!db/migrations/*.sql
