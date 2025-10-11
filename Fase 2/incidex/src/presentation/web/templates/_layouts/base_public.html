@@ -1,26 +1,24 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title or "Incidex" }}</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #f5f7fa; margin: 0; padding: 0; }
-        header { background: #0d47a1; color: white; padding: 1rem; text-align: center; }
-        footer { background: #263238; color: white; text-align: center; padding: 0.5rem; font-size: 0.8rem; }
-        main { padding: 2rem; text-align: center; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title or "Incidex" }}</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
 </head>
 <body>
-    <header>
-        <h1>Incidex</h1>
-        <p>Ticketera Inteligente para la Gestión de Incidencias</p>
-    </header>
-    <main>
-        {% block content %}{% endblock %}
-    </main>
-    <footer>
-        <p>© 2025 Incidex - Proyecto DUOC UC</p>
-    </footer>
+  {% include "_partials/header_public.html" %}
+  {% include "_partials/flash_toasts.jinja" %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container inner">
+      © 2025 Incidex · Proyecto DUOC UC
+    </div>
+  </footer>
 </body>
 </html>

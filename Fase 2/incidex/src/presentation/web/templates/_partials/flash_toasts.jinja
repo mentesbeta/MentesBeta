@@ -1,0 +1,27 @@
+{# templates/_partials/flash_toasts.jinja #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div aria-live="polite" style="max-width:1100px;margin:1rem auto;">
+      {% for category, msg in messages %}
+        {% if category == 'success' %}
+          {% set bg = '#e6f7ec' %}
+          {% set fg = '#1b5e20' %}
+          {% set bd = '#a5d6a7' %}
+        {% elif category == 'error' or category == 'danger' %}
+          {% set bg = '#ffebee' %}
+          {% set fg = '#b71c1c' %}
+          {% set bd = '#ef9a9a' %}
+        {% else %}
+          {% set bg = '#e3f2fd' %}
+          {% set fg = '#0d47a1' %}
+          {% set bd = '#90caf9' %}
+        {% endif %}
+
+        <div style="padding:.7rem 1rem;border-radius:6px;margin-bottom:.5rem;
+                    background: {{ bg }}; color: {{ fg }}; border:1px solid {{ bd }};">
+          {{ msg }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}

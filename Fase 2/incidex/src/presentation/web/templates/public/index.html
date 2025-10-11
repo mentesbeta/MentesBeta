@@ -1,5 +1,14 @@
 {% extends "_layouts/base_public.html" %}
 {% block content %}
-    <h2>Bienvenido a Incidex</h2>
-    <p>El sistema está funcionando correctamente 🚀</p>
+  <section class="hero--banner">
+  <div class="hero__image">
+    <img src="{{ url_for('static', filename='img/hero_bg.jpg') }}" alt="Incidex - Ticketera Inteligente">
+  </div>
+
+  <div class="hero__content">
+    <a class="btn" href="{{ url_for('auth.login') }}">Comenzar ahora</a>
+    <a class="btn" href="{{ url_for('public.features') }}">Características</a>
+  </div>
+</section>
+
 {% endblock %}

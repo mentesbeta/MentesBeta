@@ -1,0 +1,23 @@
+<header class="site-header site-header--light" role="banner">
+  <div class="container nav" aria-label="Barra principal">
+    <!-- Brand -->
+    <a class="brand brand--row" href="{{ url_for('public.index') }}">
+      <img src="{{ url_for('static', filename='img/logo_incidex.png') }}"
+           alt="Incidex" class="brand__logo">
+    </a>
+
+    <!-- Nav centered -->
+    <nav class="nav-items nav-items--center">
+      <a class="nav-link {{ 'is-active' if request.endpoint=='public.index' else '' }}" href="{{ url_for('public.index') }}">Inicio</a>
+      <a class="nav-link {{ 'is-active' if request.endpoint=='public.features' else '' }}" href="{{ url_for('public.features') }}">Características</a>
+      <a class="nav-link" href="#">Sobre Incidex</a>
+      <a class="nav-link {{ 'is-active' if request.endpoint=='public.support' else '' }}" href="{{ url_for('public.support') }}">Contacto/Soporte</a>
+    </nav>
+
+    <!-- Login right -->
+    <a class="login-btn" href="{{ url_for('auth.login') }}">
+      <img class="login-btn__icon" alt="" src="{{ url_for('static', filename='img/icon_user.svg') }}">
+      <span>Login</span>
+    </a>
+  </div>
+</header>
