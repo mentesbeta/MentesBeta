@@ -1,14 +1,113 @@
 {% extends "_layouts/base_public.html" %}
 {% block content %}
-  <section class="hero--banner">
-  <div class="hero__image">
-    <img src="{{ url_for('static', filename='img/hero_bg.jpg') }}" alt="Incidex - Ticketera Inteligente">
-  </div>
+  
+<section class="hero--banner">
+  <div class="hero__inner">
+    <div class="hero__image">
+      <img src="{{ url_for('static', filename='img/hero_bg.jpg') }}" alt="Incidex - Ticketera Inteligente">
+    </div>
 
-  <div class="hero__content">
-    <a class="btn" href="{{ url_for('auth.login') }}">Comenzar ahora</a>
-    <a class="btn" href="{{ url_for('public.features') }}">Características</a>
+    <div class="hero__content">
+      <a class="btn btn--primary" href="{{ url_for('auth.login') }}">Comenzar ahora</a>
+      <a class="btn btn--ghost" href="{{ url_for('public.features') }}">Características</a>
+    </div>
   </div>
 </section>
 
+<section class="section-testimonials" id="clientes">
+  <div class="container">
+    <div class="section-head">
+      <h3>Comentarios de nuestros clientes</h3>
+      <p>“Sé uno de ellos”</p>
+    </div>
+
+    <div class="testi-grid">
+      <article class="testi-card">
+        <div class="testi-author">
+          <img class="testi-avatar"
+               src="{{ url_for('static', filename='img/avatars/ava_1.jpg') }}"
+               alt="Avatar cliente">
+          <div>
+            <div class="testi-name">María López</div>
+            <div class="testi-role">Líder TI · Empresa XYZ</div>
+          </div>
+        </div>
+        <div class="testi-quote">
+          “Excelente experiencia, mejoró nuestro flujo de incidencias.”
+        </div>
+      </article>
+      <article class="testi-card">
+        <div class="testi-author">
+          <img class="testi-avatar"
+               src="{{ url_for('static', filename='img/avatars/ava_2.jpg') }}"
+               alt="Avatar cliente">
+          <div>
+            <div class="testi-name">Carlos Pérez</div>
+            <div class="testi-role">Jefe de Operaciones · ACME</div>
+          </div>
+        </div>
+        <div class="testi-quote">
+          “La priorización automática y los resúmenes nos ahorran horas cada semana.”
+        </div>
+      </article>
+      <article class="testi-card">
+        <div class="testi-author">
+          <img class="testi-avatar"
+               src="{{ url_for('static', filename='img/avatars/ava_3.jpg') }}"
+               alt="Avatar cliente">
+          <div>
+            <div class="testi-name">Daniela Rivas</div>
+            <div class="testi-role">Service Desk · Contoso</div>
+          </div>
+        </div>
+        <div class="testi-quote">
+          “La clasificación con IA nos ayudó a ordenar y reducir los tiempos de respuesta.”
+        </div>
+      </article>
+      <article class="testi-card">
+        <div class="testi-author">
+          <img class="testi-avatar"
+               src="{{ url_for('static', filename='img/avatars/ava_4.jpg') }}"
+               alt="Avatar cliente">
+          <div>
+            <div class="testi-name">Ignacio Morales</div>
+            <div class="testi-role">Analista N2 · Fabrikam</div>
+          </div>
+        </div>
+        <div class="testi-quote">
+          “Integró bien con nuestro flujo y la curva de aprendizaje fue corta.”
+        </div>
+      </article>
+      <article class="testi-card">
+        <div class="testi-author">
+          <img class="testi-avatar"
+               src="{{ url_for('static', filename='img/avatars/ava_5.jpg') }}"
+               alt="Avatar cliente">
+          <div>
+            <div class="testi-name">Paula Araya</div>
+            <div class="testi-role">PM · Innotech</div>
+          </div>
+        </div>
+        <div class="testi-quote">
+          “Los reportes CSV y los filtros nos simplificaron la gestión semanal.”
+        </div>
+      </article>
+      <article class="testi-card">
+        <div class="testi-author">
+          <img class="testi-avatar"
+               src="{{ url_for('static', filename='img/avatars/ava_6.jpg') }}"
+               alt="Avatar cliente">
+          <div>
+            <div class="testi-name">Jorge Campos</div>
+            <div class="testi-role">Soporte · Northwind</div>
+          </div>
+        </div>
+        <div class="testi-quote">
+          “Los formularios con validaciones disminuyeron errores de ingreso.”
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
 {% endblock %}
+

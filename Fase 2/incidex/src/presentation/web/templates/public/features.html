@@ -1,12 +1,70 @@
 {% extends "_layouts/base_public.html" %}
 {% block content %}
-  <h2>Características</h2>
-  <ul style="line-height:1.9;">
-    <li>Gestión completa de tickets (creación, clasificación, asignación, seguimiento).</li>
-    <li>Módulo de IA: sugerencia de categoría y prioridad, resúmenes y recomendaciones.</li>
-    <li>Historial, comentarios, adjuntos y watchers por ticket.</li>
-    <li>Reportes exportables a CSV con filtros.</li>
-    <li>Seguridad: autenticación por roles y manejo de sesiones.</li>
-    <li>Aplicación web responsiva + app de escritorio para mantenedores.</li>
-  </ul>
+
+<!-- Encabezado de página -->
+<section class="page-hero">
+  <div class="container">
+    <h1 class="page-hero__title">Características</h1>
+    <p class="page-hero__subtitle">Todo lo que necesitas para ordenar tus incidencias</p>
+  </div>
+</section>
+
+<!-- Grid de características -->
+<section class="section-features" id="features">
+  <div class="container">
+    <div class="features__grid">
+      <article class="feature">
+        <div class="feature__icon"></div>
+        <h4>Clasificación con IA</h4>
+        <p>Detecta prioridad, categoría y área automáticamente a partir del texto del ticket.</p>
+      </article>
+
+      <article class="feature">
+        <div class="feature__icon"></div>
+        <h4>Reportes CSV</h4>
+        <p>Filtra y exporta métricas (SLA, estados, analistas) para análisis semanal.</p>
+      </article>
+
+      <article class="feature">
+        <div class="feature__icon"></div>
+        <h4>Roles y sesiones seguras</h4>
+        <p>Autenticación por perfiles, enmascaramiento de claves y manejo de sesiones.</p>
+      </article>
+
+      <article class="feature">
+        <div class="feature__icon"></div>
+        <h4>Rápido y usable</h4>
+        <p>Interfaz simple, validaciones y diseño responsivo pensado para el día a día.</p>
+      </article>
+
+      <article class="feature">
+        <div class="feature__icon"></div>
+        <h4>Notificaciones</h4>
+        <p>Avisa por correo o móvil los cambios de estado importantes de cada ticket.</p>
+      </article>
+
+      <article class="feature">
+        <div class="feature__icon"></div>
+        <h4>8 mantenedores</h4>
+        <p>Usuarios, clientes, categorías, estados, prioridades, SLA, reportes y permisos.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+
+<!-- CTA final -->
+<section class="section-cta">
+  <div class="container cta__box">
+    <div>
+      <h3>¿Listo para ordenar tus incidencias?</h3>
+      <p class="muted">Comienza a usar Incidex y mejora tus tiempos de respuesta hoy.</p>
+    </div>
+    <div class="cta__actions">
+      <a class="btn btn-primary" href="{{ url_for('auth.login') }}">Probar ahora</a>
+      <a class="btn btn-outline" href="{{ url_for('public.support') }}">Hablar con soporte</a>
+    </div>
+  </div>
+</section>
+
 {% endblock %}
