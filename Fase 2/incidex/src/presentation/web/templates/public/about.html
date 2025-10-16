@@ -1,0 +1,161 @@
+{% extends "_layouts/base_public.html" %}
+{% set title = "Sobre Incidex" %}
+
+{% block content %}
+
+<!-- =================== HERO =================== -->
+<section class="page-hero -sm" id="hero-about" aria-label="Encabezado Sobre Incidex">
+  <div class="container">
+    <h1 class="page-hero__title">Sobre Incidex</h1>
+    <p class="lead">Nuestra plataforma para ordenar, priorizar y acelerar la gestión de incidencias.</p>
+  </div>
+</section>
+
+<main>
+
+  <!-- =============== SECCIÓN: RESUMEN =============== -->
+  <section class="section about-overview" id="overview">
+    <div class="container grid-2 gap-lg">
+      <div class="about-overview__media">
+        <img 
+          src="{{ url_for('static', filename='img/banner_incidex.jpg') }}" 
+          alt="Incidex - Ilustración del sistema"
+          loading="lazy">
+      </div>
+
+      <div class="about-overview__content">
+        <h2>¿Qué es Incidex?</h2>
+        <p>
+          Incidex es un sistema de gestión de incidencias que usa IA para
+          <strong>clasificar, priorizar y resumir</strong> tickets, ayudando a los equipos a
+          enfocarse en lo importante y reducir los tiempos de respuesta.
+        </p>
+
+        <ul class="list-check">
+          <li>Clasificación automática de prioridad, categoría y área.</li>
+          <li>Seguimiento claro con estados y notificaciones.</li>
+          <li>Panel simple, rápido y usable para el día a día.</li>
+          <li>Reportes exportables (CSV) para tus métricas.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============== SECCIÓN: VALORES =============== -->
+  <section class="section -light about-values" id="values">
+    <div class="container">
+      <h2 class="section__title">Nuestros pilares</h2>
+
+      <div class="grid-3 gap-lg">
+        <article class="card -elev">
+          <h3>Simpleza</h3>
+          <p>Tomar acción debe ser fácil: interfaz limpia, accesible y directa.</p>
+        </article>
+
+        <article class="card -elev">
+          <h3>Velocidad</h3>
+          <p>Automatizamos lo repetitivo con IA, para que tu equipo gane tiempo real.</p>
+        </article>
+
+        <article class="card -elev">
+          <h3>Confianza</h3>
+          <p>Roles, sesiones seguras y datos exportables para auditorías.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============== SECCIÓN: HISTORIA / TIMELINE =============== -->
+  <section class="section about-history" id="history">
+    <div class="container grid-2 gap-lg">
+      <div>
+        <h2>Cómo llegamos aquí</h2>
+        <p>Incidex nació para ayudar a equipos que necesitaban ordenar el caos de tickets y mantener métricas claras.</p>
+      </div>
+
+      <div class="timeline">
+        <div class="t-item">
+          <span class="t-dot" aria-hidden="true"></span>
+          <div class="t-content">
+            <h3>2024 — Primer prototipo</h3>
+            <p>Probamos la clasificación automática con tickets reales y logramos una priorización consistente.</p>
+          </div>
+        </div>
+
+        <div class="t-item">
+          <span class="t-dot" aria-hidden="true"></span>
+          <div class="t-content">
+            <h3>2025 — Módulos de reportes</h3>
+            <p>Agregamos exportaciones CSV y paneles simples para el seguimiento semanal.</p>
+          </div>
+        </div>
+
+        <div class="t-item">
+          <span class="t-dot" aria-hidden="true"></span>
+          <div class="t-content">
+            <h3>Hoy — Mejoras continuas</h3>
+            <p>Seguimos escuchando a usuarios, mejorando flujos y ampliando integraciones.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============== SECCIÓN: EQUIPO =============== -->
+  <section class="section -light about-team" id="team">
+    <div class="container">
+      <h2 class="section__title">Equipo</h2>
+
+      <div class="grid-3 gap-lg team">
+        <div class="card team__item">
+          <div class="member">
+            <img src="{{ url_for('static', filename='img/avatars/ava_1.jpg') }}" alt="Miembro del equipo" loading="lazy">
+            <div>
+              <strong>Manuel Varela</strong><br>
+              <small>Presidente</small>
+            </div>
+          </div>
+          <p>Desarrollador Web, Arquitecto y Lider de proyecto</p>
+        </div>
+
+        <div class="card team__item">
+          <div class="member">
+            <img src="{{ url_for('static', filename='img/avatars/ava_2.jpg') }}" alt="Miembro del equipo" loading="lazy">
+            <div>
+              <strong>Bruno Villarroel</strong><br>
+              <small>Tech Lead</small>
+            </div>
+          </div>
+          <p>Desarrollador App Escritorio y buenas prácticas de código.</p>
+        </div>
+
+        <div class="card team__item">
+          <div class="member">
+            <img src="{{ url_for('static', filename='img/avatars/ava_3.jpg') }}" alt="Miembro del equipo" loading="lazy">
+            <div>
+              <strong>Eduardo Dias</strong><br>
+              <small>Data/IA</small>
+            </div>
+          </div>
+          <p>Documetador y analista de procesos.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============== CTA FINAL =============== -->
+  <section class="section-cta">
+  <div class="container cta__box">
+    <div>
+      <h3>¿Listo para ordenar tus incidencias?</h3>
+      <p class="muted">Comienza a usar Incidex y mejora tus tiempos de respuesta hoy.</p>
+    </div>
+    <div class="cta__actions">
+      <a class="btn btn-outline" href="{{ url_for('auth.login') }}">Probar ahora</a>
+      <a class="btn btn-outline" href="{{ url_for('public.support') }}">Hablar con soporte</a>
+    </div>
+  </div>
+</section>
+
+</main>
+{% endblock %}

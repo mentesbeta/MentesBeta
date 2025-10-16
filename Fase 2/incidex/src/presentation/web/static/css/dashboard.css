@@ -1,0 +1,110 @@
+/* ================================================================
+   DASHBOARD (área privada)
+   ================================================================ */
+
+.private-main { flex: 1; }
+
+/* Hero superior */
+.page-hero.-sm{
+  padding: 2.8rem 0 1.6rem;
+  background: linear-gradient(180deg,#1976d2 0%, #0d47a1 100%);
+  color:#fff;
+  text-align:center;
+}
+.page-hero__title{
+  margin:0 0 .3rem;
+  font-size:2rem;
+  font-weight:800;
+}
+.page-hero .lead{
+  opacity:.95;
+  max-width:800px;
+  margin:.2rem auto 0;
+}
+
+/* Contenedor del cuerpo */
+.section.dashboard__body { padding: 28px 0; }
+
+/* KPIs */
+.kpis{
+  display:grid;
+  grid-template-columns: repeat(3,1fr);
+  gap:18px;
+  margin-bottom:16px;
+}
+.kpi{
+  background:#fff;
+  border:1px solid #edf2f7;
+  border-radius:14px;
+  padding:16px;
+  box-shadow:0 6px 18px rgba(2,27,51,.06);
+}
+.kpi header h3{
+  margin:0 0 4px; font-size:16px; color:#0d2847;
+}
+.kpi .muted{ color:#607284; font-size:12px; }
+.kpi__value{
+  display:block; margin-top:6px;
+  font-size:28px; font-weight:800; color:#0d2847;
+}
+.kpi.-primary  { border-left:4px solid #1976d2; }
+.kpi.-warning  { border-left:4px solid #ff9800; }
+.kpi.-success  { border-left:4px solid #2e7d32; }
+
+/* Acciones rápidas */
+.quick-actions{
+  display:flex; gap:10px; flex-wrap:wrap;
+  margin: 10px 0 16px;
+}
+
+/* Filtro */
+.filter{
+  display:flex; gap:10px; flex-wrap:wrap;
+  margin: 6px 0 18px;
+}
+.input{
+  padding:.62rem .75rem;
+  border:1px solid #d9e2ec; border-radius:10px;
+  background:#fff; font-size:.95rem; outline:none;
+}
+.input:focus{ border-color:#1e63d1; box-shadow:0 0 0 3px rgba(30,99,209,.15); }
+
+/* Card / tabla / vacío */
+.card{
+  background:#fff; border:1px solid #e6eef7; border-radius:14px; padding:16px;
+}
+.card.-elev{ box-shadow:0 8px 24px rgba(2,27,51,.06); }
+.table-head{
+  display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;
+}
+.section__title{ margin:0; font-size:18px; font-weight:800; color:#0d2847; }
+.empty{ text-align:center; padding:24px 8px; color:#576978; }
+
+/* Botones reutilizados */
+.btn{ display:inline-block; padding:.6rem .95rem; border-radius:10px; text-decoration:none; font-weight:700; }
+.btn-primary{ background:#0d47a1; color:#fff; }
+.btn-primary:hover{ filter:brightness(.95) }
+.btn-outline{ border:2px solid #0d47a1; color:#0d47a1; background:transparent; }
+.btn-outline:hover{ background:rgba(13,71,161,.08); }
+
+/* Responsive */
+@media (max-width: 960px){
+  .kpis{ grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px){
+  .kpis{ grid-template-columns: 1fr; }
+  .page-hero__title{ font-size:1.6rem; }
+}
+
+/* ================================================================
+   Cortafuegos: evita que imágenes sueltas contaminen el dashboard
+   (no afecta logo del header porque está fuera de .dashboard)
+   ================================================================ */
+.dashboard > img,
+.dashboard main > img,
+.dashboard img[src*="banner"],
+.dashboard img[src*="hero"],
+.dashboard img[alt*="Incidex"],
+.dashboard img[alt*="Ticketera"]{
+  display:none !important;
+}

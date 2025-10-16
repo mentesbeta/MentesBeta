@@ -1,0 +1,90 @@
+/* ============================ */
+/*   ABOUT (Sobre Incidex)      */
+/* ============================ */
+
+/* ---------- Helpers de layout locales ---------- */
+.section { padding: 2.2rem 0; }
+.section.-light { background: #eef5fb; }
+.section__title { margin: 0 0 1rem; font-size: 1.35rem; font-weight: 800; color: #0d2847; }
+
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.gap-lg { gap: 1.4rem; }
+
+.card {
+  background: #fff;
+  border: 1px solid #e6eef7;
+  border-radius: 14px;
+  padding: 1.1rem;
+}
+.card.-elev { box-shadow: 0 6px 18px rgba(13,71,161,.08); }
+
+/* ---------- Overview ---------- */
+.about-overview__media img {
+  width: 60%;
+  transform: translateX(28%);
+  height: auto;
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow: 0 10px 24px rgba(2,27,51,.08);
+}
+.about-overview__content h2 {
+  margin: 0 0 .35rem;
+  font-size: 1.45rem;
+}
+.about-overview__content p { margin: 0 0 .5rem; color: #233044; }
+.about-overview__meta { margin-top: .8rem; display: flex; gap: .6rem; flex-wrap: wrap; }
+
+.list-check { padding-left: 1.2rem; }
+.list-check li { list-style: '✔  '; margin: .35rem 0; color: #233044; }
+
+/* ---------- Valores (cards) ---------- */
+.about-values .card h3 {
+  margin: 0 0 .35rem;
+  font-size: 1.15rem;
+  color: #0d2847;
+}
+.about-values .card p { margin: 0; color: #374156; }
+
+/* ---------- Timeline (historia) ---------- */
+.timeline {
+  position: relative;
+  margin-top: .5rem;
+  border-left: 3px solid #1976d2;
+  padding-left: 1rem;
+}
+.t-item { position: relative; margin: 1rem 0; }
+.t-dot {
+  position: absolute;
+  left: -1.22rem;
+  top: .35rem;
+  width: .7rem; height: .7rem;
+  background: #1976d2; border-radius: 50%;
+}
+.t-content h3 { margin: 0 0 .25rem; font-size: 1rem; color: #0d2847; }
+.t-content p { margin: 0; color: #374156; }
+
+/* ---------- Team ---------- */
+.team .member {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  margin-bottom: .35rem;
+}
+.team .member img {
+  width: 48px; height: 48px;
+  object-fit: cover; border-radius: 50%;
+  border: 2px solid #edf3f8;
+}
+
+/* ---------- Responsivo ---------- */
+@media (max-width: 980px) {
+  .grid-2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .grid-3 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px) {
+  .grid-3 { grid-template-columns: 1fr; }
+  .cta-inner { flex-direction: column; text-align: center; }
+}

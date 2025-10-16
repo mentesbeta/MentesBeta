@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title or "Incidex" }}</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" />
+  <!-- CSS base comunes -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}">
+
+  {% block extra_css %}{% endblock %}
+</head>
+<body class="is-private {{ body_class|default('') }}">
+  {% include "_partials/header_private.html" %}
+
+  <main class="private-main">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% include "_partials/footer.html" %}
+
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

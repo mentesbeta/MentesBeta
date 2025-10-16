@@ -1,0 +1,97 @@
+/* ==================================================================== HERO HOME ==================================================================== */
+.hero--banner{position:relative; min-height:520px; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#1976d2 0%,#0d47a1 100%); overflow:hidden;}
+
+.hero__image{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none;}
+
+.hero__image img {
+  width: 70%;
+  max-width: 800px;
+  height: auto;
+  object-fit: contain;
+  animation: float 8s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.hero__content {
+  position: absolute;
+  left: 50%;
+  bottom: 60px;
+  transform: translateX(-58%);
+  z-index: 3;
+  display: flex;
+  gap: 12px;
+  text-align: center;
+}
+
+.btn {
+  background: transparent;
+  color: #fff;
+  border: 2px solid #fff;
+  border-radius: 8px;
+  padding: 10px 22px;
+  font-weight: 500;
+  text-decoration: none;
+  margin: 0 8px;
+  transition: all 0.3s ease;
+}
+.btn:hover {
+  background: rgba(255,255,255,0.15);
+  transform: translateY(-2px);
+}
+
+/* HERO responsive */
+@media (max-width: 1024px) {
+  .hero__content { bottom: 50px; transform: translateX(-50%); }
+  .hero__image img { width: 80%; max-width: 680px; }
+}
+@media (max-width: 768px) {
+  .hero__content { bottom: 40px; }
+  .hero__image img { width: 88%; max-width: 520px; }
+  .btn { display: inline-block; margin: 6px 6px; padding: 0.55rem 0.9rem; }
+}
+
+/* ==================================================================== TESTIMONIOS ==================================================================== */
+.section-testimonials {
+  background: #e3eef3;
+  padding: 48px 0;
+}
+.section-testimonials .section-head { margin-bottom: 22px; }
+.section-testimonials .section-head h3 {
+  font-size: 20px;
+  color: #0d2847;
+  font-weight: 700;
+}
+.section-testimonials .section-head p {
+  color: #38506a;
+  font-size: 14px;
+}
+
+.testi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+.testi-card {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(10, 31, 68, .06);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.testi-author { display: flex; align-items: center; gap: 10px; }
+.testi-avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  object-fit: cover; border: 2px solid #edf3f8;
+}
+.testi-name { font-size: 14px; font-weight: 700; color: #0d2847; }
+.testi-role { font-size: 12px; color: #5a6b7b; }
+.testi-quote { font-size: 14px; color: #1d2a3a; line-height: 1.45; }
+
+@media (max-width: 960px) { .testi-grid { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 640px) { .testi-grid { grid-template-columns: 1fr; } }

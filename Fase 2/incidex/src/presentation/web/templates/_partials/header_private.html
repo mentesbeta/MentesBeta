@@ -1,0 +1,26 @@
+<header class="site-header site-header--light" role="banner">
+  <div class="container nav" aria-label="Barra principal privada">
+    <!-- Brand -->
+    <a class="brand brand--row" href="{{ url_for('tickets.dashboard') }}">
+      <img src="{{ url_for('static', filename='img/logo_incidex.png') }}"
+           alt="Incidex" class="brand__logo">
+    </a>
+
+    <!-- Menú centrado -->
+    <nav class="nav-items nav-items--center" aria-label="Navegación del panel">
+      <a class="nav-link {{ 'is-active' if request.endpoint=='tickets.dashboard' else '' }}"
+         href="{{ url_for('tickets.dashboard') }}">Inicio</a>
+
+      <!-- Cuando tengas endpoints, cambia # por url_for('tickets.mine') etc. -->
+      <a class="nav-link" href="#">Mis Tickets</a>
+      <a class="nav-link" href="{{ url_for('tickets.create') }}">Nuevo Ticket</a>
+      <a class="nav-link" href="#">Reportes</a>
+    </nav>
+
+    <!-- Usuario / login -->
+    <a class="login-btn" href="{{ url_for('auth.login') }}">
+      <img class="login-btn__icon" alt="" src="{{ url_for('static', filename='img/icon_user.svg') }}">
+      <span>{{ (current_user.name if current_user and current_user.is_authenticated else 'Login') }}</span>
+    </a>
+  </div>
+</header>

@@ -1,0 +1,36 @@
+/* ==================================================================== BASE ==================================================================== */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color: #233044;
+  background: #f5f7fa;
+  line-height: 1.45;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main { flex: 1; }
+.container { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+.center { text-align: center; }
+
+/* ==================================================================== ENCABEZADOS ==================================================================== */
+
+/* ---------- Hero ---------- */
+.page-hero.-sm {
+  padding: 3.2rem 0 2rem;
+  background: linear-gradient(180deg, #1976d2 0%, #0d47a1 100%);
+  color: #fff;
+  text-align: center;
+}
+.page-hero__title {
+  margin: 0 0 .35rem;
+  font-size: 2rem;
+  font-weight: 800;
+}
+.page-hero .lead {
+  opacity: .95;
+  max-width: 800px;
+  margin: .35rem auto 0;
+}

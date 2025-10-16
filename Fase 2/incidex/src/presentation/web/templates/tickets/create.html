@@ -1,0 +1,173 @@
+{% extends "_layouts/base_private.html" %}
+{% set title = "Crear Ticket" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tickets.css') }}">
+{% endblock %}
+
+{% block content %}
+
+<!-- ===== Hero de página ===== -->
+<section class="page-hero -sm">
+  <div class="container">
+    <h1 class="page-hero__title">Crear Ticket</h1>
+  </div>
+</section>
+
+
+<!-- ===== Asistente 4 fases ===== -->
+<form class="ticket-wizard container" id="ticketForm" method="post" enctype="multipart/form-data" novalidate>
+
+  <!-- Fase 1: Información básica -->
+  <section class="step is-open" data-step="1">
+    <button class="step__head" type="button">
+      <span>Información Básica del Ticket</span>
+      <span class="chev" aria-hidden="true">▾</span>
+    </button>
+    <div class="step__body">
+      <p class="muted">Ingresa los datos principales. Describe claramente el problema y adjunta, si es necesario, archivos de apoyo.</p>
+
+      <div class="grid-2 gap-md">
+        <div class="form__group">
+          <label for="title">Título del ticket</label>
+          <input id="title" name="title" type="text" class="input" placeholder="Ej: No puedo iniciar sesión en correo">
+        </div>
+        <div></div>
+
+        <div class="form__group grid-col-span-2">
+          <label for="description">Descripción detallada</label>
+          <textarea id="description" name="description" class="textarea" rows="6"
+            placeholder="Describe qué ocurre con el mayor detalle posible, incluyendo mensajes de error o lo que intentaste hacer."></textarea>
+        </div>
+
+        <div class="form__group grid-col-span-2">
+          <div class="form__row between">
+            <label>Archivos adjuntos</label>
+            <label class="btn btn-dark btn-sm">
+              Adjuntar
+              <input id="files" name="files" type="file" multiple hidden>
+            </label>
+          </div>
+          <ul id="fileList" class="file-list" aria-live="polite"></ul>
+        </div>
+      </div>
+
+      <div class="step__actions">
+        <button type="button" class="btn btn-primary js-next">Siguiente</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Fase 2: Clasificación -->
+  <section class="step" data-step="2">
+    <button class="step__head" type="button">
+      <span>Clasificación del ticket</span>
+      <span class="chev" aria-hidden="true">▾</span>
+    </button>
+    <div class="step__body">
+      <p class="muted">Selecciona cómo clasificar la incidencia.</p>
+
+      <div class="grid-2 gap-md">
+        <div class="form__group">
+          <label for="category">Categoría</label>
+          <select id="category" name="category" class="input">
+            <option value="">Selecciona…</option>
+            <option value="correo">Correo</option>
+            <option value="hardware">Hardware</option>
+            <option value="software">Software</option>
+            <option value="red">Red</option>
+          </select>
+        </div>
+        <div class="form__group">
+          <label for="area">Área / Departamento</label>
+          <select id="area" name="area" class="input">
+            <option value="">Selecciona…</option>
+            <option value="ti">TI</option>
+            <option value="rrhh">RR.HH.</option>
+            <option value="ventas">Ventas</option>
+          </select>
+        </div>
+
+        <div class="form__group">
+          <label for="priority">Prioridad</label>
+          <select id="priority" name="priority" class="input">
+            <option value="">Selecciona…</option>
+            <option value="baja">Baja</option>
+            <option value="media">Media</option>
+            <option value="alta">Alta</option>
+            <option value="critica">Crítica</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="step__actions">
+        <button type="button" class="btn btn-outline js-prev">Atrás</button>
+        <button type="button" class="btn btn-primary js-next">Siguiente</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Fase 3: Solicitante y asignación -->
+  <section class="step" data-step="3">
+    <button class="step__head" type="button">
+      <span>Datos del solicitante y asignación</span>
+      <span class="chev" aria-hidden="true">▾</span>
+    </button>
+    <div class="step__body">
+      <p class="muted">Define quién solicita el ticket y, si corresponde, a quién se asigna inicialmente.</p>
+
+      <div class="grid-2 gap-md">
+        <div class="form__group">
+          <label for="requester">Usuario solicitante</label>
+          <input id="requester" name="requester" class="input" value="{{ current_user.name if current_user else 'Usuario Prueba' }}" readonly>
+        </div>
+        <div class="form__group">
+          <label for="assignee">Asignar a</label>
+          <input id="assignee" name="assignee" class="input" placeholder="Pendiente">
+        </div>
+        <div class="form__group">
+          <label for="initial_status">Estado inicial</label>
+          <input id="initial_status" name="initial_status" class="input" value="Nuevo" readonly>
+        </div>
+      </div>
+
+      <div class="step__actions">
+        <button type="button" class="btn btn-outline js-prev">Atrás</button>
+        <button type="button" class="btn btn-primary js-next">Siguiente</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Fase 4: Confirmación y envío -->
+  <section class="step" data-step="4">
+    <button class="step__head" type="button">
+      <span>Confirmación y envío</span>
+      <span class="chev" aria-hidden="true">▾</span>
+    </button>
+    <div class="step__body">
+      <p class="muted">Revisa que toda la información esté correcta antes de enviar tu ticket.</p>
+
+      <div class="card">
+        <div class="grid-2 gap-md">
+          <div>
+            <strong>Resumen</strong>
+            <div class="summary" id="summaryBox">
+              <!-- JS rellenará un resumen sencillo -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step__actions">
+        <button type="button" class="btn btn-outline js-prev">Atrás</button>
+        <button type="submit" class="btn btn-dark">Enviar</button>
+      </div>
+    </div>
+  </section>
+
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/tickets.js') }}"></script>
+{% endblock %}

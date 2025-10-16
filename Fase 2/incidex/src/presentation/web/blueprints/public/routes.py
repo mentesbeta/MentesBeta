@@ -13,3 +13,8 @@ def features():
 @public_bp.route("/support")
 def support():
     return render_template("public/support.html", title="Soporte")
+
+@public_bp.route("/sobre")
+def about():
+    return render_template("public/about.html", title="Sobre Incidex")
+

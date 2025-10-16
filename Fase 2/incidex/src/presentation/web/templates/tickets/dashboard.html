@@ -1,0 +1,83 @@
+{% extends "_layouts/base_private.html" %}
+{% set title = "Panel" %}
+
+{% block content %}
+<div class="dashboard">
+
+  <!-- ===== Encabezado ===== -->
+  <section class="page-hero -sm" aria-label="Inicio del panel">
+    <div class="container">
+      <h1 class="page-hero__title">Hola, {{ (current_user.name if current_user and current_user.is_authenticated else 'Usuario') }}</h1>
+      <p class="lead">Este es tu resumen de incidencias y accesos rápidos.</p>
+    </div>
+  </section>
+
+  <!-- ===== Contenido principal ===== -->
+  <section class="section dashboard__body">
+    <div class="container">
+
+      <!-- KPIs -->
+      <div class="kpis" aria-label="Resumen de incidencias">
+        <article class="kpi -primary">
+          <header>
+            <h3>Abiertos</h3>
+            <span class="muted">Tickets por atender</span>
+          </header>
+          <strong class="kpi__value">{{ (kpis.open if kpis is defined else 12) }}</strong>
+        </article>
+
+        <article class="kpi -warning">
+          <header>
+            <h3>En progreso</h3>
+            <span class="muted">Asignados / en curso</span>
+          </header>
+          <strong class="kpi__value">{{ (kpis.in_progress if kpis is defined else 5) }}</strong>
+        </article>
+
+        <article class="kpi -success">
+          <header>
+            <h3>Cerrados</h3>
+            <span class="muted">Últimos 7 días</span>
+          </header>
+          <strong class="kpi__value">{{ (kpis.closed_week if kpis is defined else 8) }}</strong>
+        </article>
+      </div>
+
+      <!-- Acciones rápidas -->
+      <div class="quick-actions" aria-label="Accesos rápidos">
+        <a class="btn btn-primary" href="{{ url_for('tickets.create') }}">➕ Nuevo ticket</a>
+        <a class="btn btn-outline" href="#">📋 Mis tickets</a>
+        <a class="btn btn-outline" href="#">📚 Todos</a>
+        <a class="btn btn-outline" href="#">📈 Reportes CSV</a>
+      </div>
+
+      <!-- Filtro simple -->
+      <form class="filter" role="search" method="get" action="#">
+        <input class="input" type="text" name="q" placeholder="Buscar por #, asunto o solicitante…">
+        <select class="input" name="status">
+          <option value="">Estado (todos)</option>
+          <option value="open">Abierto</option>
+          <option value="progress">En progreso</option>
+          <option value="closed">Cerrado</option>
+        </select>
+        <button class="btn btn-primary" type="submit">Filtrar</button>
+      </form>
+
+      <!-- Últimos tickets -->
+      <section class="card -elev" aria-label="Últimos tickets">
+        <header class="table-head">
+          <h2 class="section__title">Últimos tickets</h2>
+          <a class="btn btn-outline" href="#">Ver todos</a>
+        </header>
+
+        <div class="empty">
+          <p>No hay tickets recientes.</p>
+          <a class="btn btn-primary" href="#">Crear tu primer ticket</a>
+        </div>
+      </section>
+
+    </div>
+  </section>
+
+</div>
+{% endblock %}

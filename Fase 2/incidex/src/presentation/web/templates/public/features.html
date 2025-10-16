@@ -1,11 +1,10 @@
 {% extends "_layouts/base_public.html" %}
 {% block content %}
 
-<!-- Encabezado de página -->
-<section class="page-hero">
+<section class="page-hero -sm" id="hero-features" aria-label="Encabezado Sobre Incidex">
   <div class="container">
     <h1 class="page-hero__title">Características</h1>
-    <p class="page-hero__subtitle">Todo lo que necesitas para ordenar tus incidencias</p>
+    <p class="lead">Todo lo que necesitas para ordenar tus incidencias</p>
   </div>
 </section>
 
@@ -53,7 +52,6 @@
 </section>
 
 
-<!-- CTA final -->
 <section class="section-cta">
   <div class="container cta__box">
     <div>
@@ -61,7 +59,7 @@
       <p class="muted">Comienza a usar Incidex y mejora tus tiempos de respuesta hoy.</p>
     </div>
     <div class="cta__actions">
-      <a class="btn btn-primary" href="{{ url_for('auth.login') }}">Probar ahora</a>
+      <a class="btn btn-outline" href="{{ url_for('auth.login') }}">Probar ahora</a>
       <a class="btn btn-outline" href="{{ url_for('public.support') }}">Hablar con soporte</a>
     </div>
   </div>

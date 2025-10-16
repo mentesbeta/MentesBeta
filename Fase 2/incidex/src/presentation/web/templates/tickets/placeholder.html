@@ -1,0 +1,10 @@
+{% extends "_layouts/base_private.html" %}
+{% block content %}
+<section class="page-hero -sm">
+  <div class="container">
+    <h1 class="page-hero__title">{{ title }}</h1>
+    <p class="lead">Esta sección aún está en construcción 🚧</p>
+    <a href="{{ url_for('tickets.dashboard') }}" class="btn btn-primary mt-3">Volver al panel</a>
+  </div>
+</section>
+{% endblock %}
