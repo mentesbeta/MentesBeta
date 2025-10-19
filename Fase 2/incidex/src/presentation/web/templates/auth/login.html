@@ -23,8 +23,7 @@
 
       <form action="{{ url_for('auth.login') }}" method="post" novalidate class="form">
 
-        {# Si en el futuro usas CSRF, deja este placeholder:
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> #}
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <div class="form__group">
           <label for="email">Correo</label>

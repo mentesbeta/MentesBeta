@@ -17,10 +17,52 @@
       <a class="nav-link" href="#">Reportes</a>
     </nav>
 
-    <!-- Usuario / login -->
-    <a class="login-btn" href="{{ url_for('auth.login') }}">
-      <img class="login-btn__icon" alt="" src="{{ url_for('static', filename='img/icon_user.svg') }}">
-      <span>{{ (current_user.name if current_user and current_user.is_authenticated else 'Login') }}</span>
-    </a>
+      <!-- Usuario / login -->
+      {% if current_user and current_user.is_authenticated %}
+      <div class="user-menu" x-data>
+        <button class="user-btn" type="button" aria-haspopup="menu" aria-expanded="false">
+          <img class="user-btn__icon" alt="" src="{{ url_for('static', filename='img/icon_user.svg') }}">
+          <span>{{ current_user.name }}</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M7 10l5 5 5-5z" fill="currentColor"></path>
+          </svg>
+        </button>
+
+        <div class="user-dropdown" role="menu" hidden>
+          <!-- Opción segura: POST con CSRF -->
+          <form action="{{ url_for('auth.logout') }}" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="dropdown-item">Cerrar sesión</button>
+          </form>
+
+          <!-- Si prefieres tu ruta GET /auth/logout, deja esta línea y quita el form:
+          <a class="dropdown-item" href="{{ url_for('auth.logout') }}">Cerrar sesión</a> -->
+        </div>
+      </div>
+    {% else %}
+      <a class="login-btn" href="{{ url_for('auth.login') }}">
+        <img class="login-btn__icon" alt="" src="{{ url_for('static', filename='img/icon_user.svg') }}">
+        <span>Login</span>
+      </a>
+    {% endif %}
   </div>
 </header>
+
+<script>
+  (function () {
+    const menu = document.querySelector('.user-menu');
+    if (!menu) return;
+    const btn = menu.querySelector('.user-btn');
+    const drop = menu.querySelector('.user-dropdown');
+    const toggle = (open) => {
+      if (!drop) return;
+      if (open === undefined) drop.hidden = !drop.hidden;
+      else drop.hidden = !open;
+      btn.setAttribute('aria-expanded', String(!drop.hidden));
+    };
+    btn?.addEventListener('click', () => toggle());
+    document.addEventListener('click', (e) => {
+      if (!menu.contains(e.target)) toggle(false);
+    });
+  })();
+</script>

@@ -1,23 +1,63 @@
 from flask import Flask
 from dotenv import load_dotenv
 import os
+from datetime import timedelta
+
 from flask_login import LoginManager
+from flask_migrate import Migrate
+
+from flask_wtf import CSRFProtect
+from flask_wtf.csrf import generate_csrf
+
+from src.infrastructure.persistence.database import db
 
 def create_app():
+    
     load_dotenv()
     app = Flask(__name__)
+
     app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev_secret")
 
-    # ===== Flask-Login: inicialización mínima =====
+    # ==== Base de datos (MySQL) ====
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_pre_ping": True,
+        "pool_recycle": 280,
+    }
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    db.init_app(app)
+
+    # iniciar modelos
+    import src.domain.entities 
+
+
+    # ==== Migrate ====
+    Migrate(app, db, compare_type=True)
+
+    # ==== CSRF global ====
+    CSRFProtect(app)
+
+    @app.context_processor
+    def inject_csrf_token():
+        return {"csrf_token": generate_csrf}
+
+    # ===== Flask-Login =====
     login_manager = LoginManager()
-    login_manager.login_view = 'auth.login'   # endpoint a donde redirigiría si usas @login_required
+    login_manager.login_view = "auth.login"
     login_manager.init_app(app)
 
-    # Loader de usuario (stub). Cuando tengas tu modelo User, cámbialo:
+    from src.domain.entities.user import User
+
     @login_manager.user_loader
     def load_user(user_id: str):
-        # TODO: retornar objeto User desde DB por ID. Por ahora, no hay usuarios.
-        return None
+        # MySQL autoincrement INT
+        try:
+            return db.session.get(User, int(user_id))
+        except Exception:
+            return None
+
+    # ==== Tiempo de sesión persistente (remember me) ====
+    app.config["REMEMBER_COOKIE_DURATION"] = timedelta(days=int(os.getenv("REMEMBER_COOKIE_DURATION_DAYS", "7")))
 
     # ===== Blueprints =====
     from src.presentation.web.blueprints.public.routes import public_bp
@@ -29,8 +69,11 @@ def create_app():
     from src.presentation.web.blueprints.auth.routes import auth_bp
     app.register_blueprint(auth_bp)
 
-    # ===== current_user para plantillas (fallback seguro) =====
-    # Si Flask-Login está activo, inyecta el real; si no, inyecta uno anónimo.
+    # ==== Comandos CLI personalizados ====
+    from src.commands.seed_user import create_user_cmd
+    app.cli.add_command(create_user_cmd)
+
+     # ==== current_user disponible siempre ====
     class _Anon:
         is_authenticated = False
         name = None
@@ -39,9 +82,9 @@ def create_app():
     def inject_current_user():
         try:
             from flask_login import current_user as cu
-            return {'current_user': cu}
+            return {"current_user": cu}
         except Exception:
-            return {'current_user': _Anon()}
+            return {"current_user": _Anon()}
 
     @app.route("/health")
     def health_check():
