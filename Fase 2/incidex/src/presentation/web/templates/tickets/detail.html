@@ -1,0 +1,105 @@
+{% extends "_layouts/base_private.html" %}
+{% set title = ticket.code ~ " · " ~ ticket.title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ticket_detail.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="page-hero -sm">
+  <div class="container">
+    <h1 class="page-hero__title">{{ ticket.code }}</h1>
+    <p class="lead">{{ ticket.title }}</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container ticket-detail">
+
+    <!-- Meta -->
+    <div class="meta">
+      <div><strong>Estado:</strong> <span class="badge s-{{ ticket.status_name|lower }}">{{ ticket.status_name }}</span></div>
+      <div><strong>Prioridad:</strong> <span class="badge p-{{ ticket.priority_name|lower }}">{{ ticket.priority_name }}</span></div>
+      <div><strong>Categoría:</strong> {{ ticket.category_name or "—" }}</div>
+      <div><strong>Solicitante:</strong> {{ ticket.requester_name }}</div>
+      <div><strong>Asignado a:</strong> {{ ticket.assignee_name or "—" }}</div>
+      <div><strong>Creado:</strong> {{ ticket.created_at }}</div>
+      <div><strong>Actualizado:</strong> {{ ticket.updated_at }}</div>
+    </div>
+
+    <div class="grid-2 gap-md">
+      <!-- Conversación -->
+      <section class="card">
+        <h3>Conversación</h3>
+        <article class="ticket-body">
+          <p>{{ ticket.description }}</p>
+        </article>
+
+        <ul class="comments">
+          {% for c in comments %}
+            <li>
+              <div class="c-head">
+                <strong>{{ c.author_name }}</strong>
+                <span class="muted">{{ c.created_at }}</span>
+              </div>
+              <p>{{ c.body }}</p>
+            </li>
+          {% else %}
+            <li class="muted">Sin comentarios.</li>
+          {% endfor %}
+        </ul>
+
+        {% if can_act %}
+        <form action="{{ url_for('tickets.comment', ticket_id=ticket.id) }}" method="post" class="comment-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <textarea name="body" rows="3" class="textarea" placeholder="Escribe un comentario..."></textarea>
+          <div class="right"><button class="btn btn-primary" type="submit">Agregar comentario</button></div>
+        </form>
+        {% endif %}
+      </section>
+
+      <!-- Adjuntos -->
+      <section class="card">
+        <h3>Adjuntos</h3>
+        <ul class="attachments">
+          {% for a in attachments %}
+            <li>
+              <a class="link" href="{{ url_for('tickets.download', ticket_id=ticket.id, att_id=a.id) }}">{{ a.file_name }}</a>
+              <span class="muted">({{ a.file_size }} bytes · {{ a.created_at }})</span>
+            </li>
+          {% else %}
+            <li class="muted">Sin archivos.</li>
+          {% endfor %}
+        </ul>
+
+        {% if can_act %}
+        <form action="{{ url_for('tickets.upload', ticket_id=ticket.id) }}" method="post" enctype="multipart/form-data" class="upload-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="file" name="file" required>
+          <button class="btn btn-outline" type="submit">Subir</button>
+        </form>
+        {% endif %}
+      </section>
+    </div>
+
+    <!-- Historial -->
+    <section class="card">
+      <h3>Historial</h3>
+      <ol class="history">
+        {% for h in history %}
+          <li>
+            <span class="muted">{{ h.created_at }}</span>
+            <strong>{{ h.actor }}</strong> cambió estado
+            {% if h.from_status %}de <em>{{ h.from_status }}</em>{% endif %}
+            a <em>{{ h.to_status }}</em>
+            {% if h.note %} — {{ h.note }}{% endif %}
+          </li>
+        {% else %}
+          <li class="muted">Sin movimientos.</li>
+        {% endfor %}
+      </ol>
+    </section>
+
+  </div>
+</section>
+{% endblock %}

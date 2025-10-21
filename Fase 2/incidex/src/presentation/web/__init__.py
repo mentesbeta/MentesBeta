@@ -37,6 +37,14 @@ def create_app():
     # ==== CSRF global ====
     CSRFProtect(app)
 
+    # ==== Prueba borrar ====
+    app.config.setdefault("UPLOAD_FOLDER", os.path.join(os.getcwd(), "var", "uploads"))
+    upload_base = os.path.join(os.getcwd(), "var", "uploads")
+    os.makedirs(upload_base, exist_ok=True)
+    app.config["UPLOAD_FOLDER"] = upload_base
+
+
+
     @app.context_processor
     def inject_csrf_token():
         return {"csrf_token": generate_csrf}

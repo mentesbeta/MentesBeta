@@ -26,7 +26,6 @@ def login_post():
     user = svc.authenticate(email, password)
 
     if not user:
-        flash("Correo o contraseña inválidos.", "error")
         return redirect(url_for("auth.login"))
 
     login_user(user, remember=remember)
@@ -36,5 +35,4 @@ def login_post():
 def logout():
     if current_user.is_authenticated:
         logout_user()
-        #flash("Sesión cerrada correctamente.", "info")
     return redirect(url_for("public.index"))

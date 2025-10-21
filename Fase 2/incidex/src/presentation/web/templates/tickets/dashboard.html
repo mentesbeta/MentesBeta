@@ -43,26 +43,27 @@
         </article>
       </div>
 
-      <!-- Acciones rápidas -->
-      <div class="quick-actions" aria-label="Accesos rápidos">
-        <a class="btn btn-primary" href="{{ url_for('tickets.create') }}">➕ Nuevo ticket</a>
-        <a class="btn btn-outline" href="#">📋 Mis tickets</a>
-        <a class="btn btn-outline" href="#">📚 Todos</a>
-        <a class="btn btn-outline" href="#">📈 Reportes CSV</a>
-      </div>
 
       <!-- Filtro simple -->
       <form class="filter" role="search" method="get" action="#">
-        <input class="input" type="text" name="q" placeholder="Buscar por #, asunto o solicitante…">
-        <select class="input" name="status">
-          <option value="">Estado (todos)</option>
-          <option value="open">Abierto</option>
-          <option value="progress">En progreso</option>
-          <option value="closed">Cerrado</option>
-        </select>
-        <button class="btn btn-primary" type="submit">Filtrar</button>
-      </form>
+          <input class="input" type="text" name="q" placeholder="Buscar por #, asunto o solicitante…">
+          <select class="input" name="status">
+            <option value="">Estado (todos)</option>
+            <option value="open">Abierto</option>
+            <option value="progress">En progreso</option>
+            <option value="closed">Cerrado</option>
+          </select>
+          <button class="btn btn-primary" type="submit">Filtrar</button>
+        </form>
 
+      <!-- Acciones rápidas -->
+      <div class="quick-actions" aria-label="Accesos rápidos">
+        <a class="btn btn-primary" href="{{ url_for('tickets.create') }}">Nuevo ticket</a>
+        <a class="btn btn-outline" href="#">Mis tickets</a>
+        <a class="btn btn-outline" href="#">Reporte</a>
+      </div>
+
+    
       <!-- Últimos tickets -->
       <section class="card -elev" aria-label="Últimos tickets">
         <header class="table-head">

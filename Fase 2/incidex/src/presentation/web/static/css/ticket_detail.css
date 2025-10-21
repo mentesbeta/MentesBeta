@@ -1,0 +1,23 @@
+.ticket-detail .meta{
+  display:grid; grid-template-columns: repeat(3,1fr); gap:10px;
+  background:#fff; border:1px solid #e6eef7; border-radius:14px; padding:12px; margin-bottom:14px;
+}
+.grid-2{ display:grid; grid-template-columns: 2fr 1fr; }
+.gap-md{ gap:14px; }
+.card{ background:#fff; border:1px solid #e6eef7; border-radius:14px; padding:14px; }
+.ticket-body{ background:#f9fbff; border:1px dashed #cfe0ff; border-radius:10px; padding:10px; margin-bottom:10px; }
+.comments{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px; }
+.c-head{ display:flex; gap:8px; align-items:center; }
+.muted{ color:#687385; font-size:.9rem; }
+.attachments{ list-style:none; padding:0; margin:0 0 10px; display:flex; flex-direction:column; gap:8px; }
+.history{ margin:0; padding-left:18px; }
+.comment-form .right{ text-align:right; margin-top:6px; }
+.textarea{ width:100%; min-height:90px; padding:.7rem; border:1px solid #d9e2ec; border-radius:10px; }
+.btn{ display:inline-block; padding:.55rem .9rem; border-radius:10px; font-weight:700; text-decoration:none; border:2px solid transparent;}
+.btn-primary{ background:#0d47a1; color:#fff;}
+.btn-outline{ border-color:#0d47a1; color:#0d47a1; background:transparent; }
+.badge{ padding:.15rem .45rem; border-radius:8px; font-weight:700; font-size:.85rem; }
+.p-alta{ background:#ffe5e5; color:#b00020 } .p-media{ background:#fff5e6; color:#d47f00 } .p-baja{ background:#e9f7ef; color:#237a38 }
+.s-nuevo{ background:#eaf1ff; color:#0b2f69 } .s-en_progreso{ background:#fff9db; color:#7a6200 } .s-cerrado{ background:#e8f5e9; color:#1b5e20 }
+@media (max-width: 960px){ .grid-2{ grid-template-columns: 1fr; } .ticket-detail .meta{ grid-template-columns: 1fr 1fr; } }
+@media (max-width: 640px){ .ticket-detail .meta{ grid-template-columns: 1fr; } }
