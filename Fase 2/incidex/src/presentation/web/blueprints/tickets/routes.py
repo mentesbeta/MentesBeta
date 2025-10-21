@@ -11,9 +11,20 @@ tickets = Blueprint('tickets', __name__, url_prefix='/app')
 @tickets.route('/dashboard', endpoint='dashboard')
 @login_required
 def dashboard():
-    kpis = {"open": 12, "in_progress": 5, "overdue": 2, "closed_week": 8}
-    tickets_data = []
-    return render_template('tickets/dashboard.html', title='Panel', kpis=kpis, tickets=tickets_data)
+    # Crear el servicio con su repositorio
+    svc = TicketService(TicketRepository())
+
+    # Obtener los datos del dashboard
+    data = svc.dashboard_data(current_user.id, limit=10)
+    recent = list(data["recent"])
+    # Renderizar la vista
+    return render_template(
+        'tickets/dashboard.html',
+        title='Panel',
+        kpis=data["kpis"],
+        recent=recent,
+        recent_len=len(recent)
+    )
 
 def _bind_choices(form: TicketCreateForm, svc: TicketService):
     cats = svc.catalogs()

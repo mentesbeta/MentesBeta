@@ -1,13 +1,30 @@
 from dataclasses import dataclass
-from sqlalchemy import text
+from datetime import datetime, timedelta
+from sqlalchemy import text, func
+from typing import Dict, List
 from src.infrastructure.persistence.database import db
+from src.domain.entities.ticket import Ticket, Status
 
 @dataclass
 class CreatedTicket:
     id: int
     code: str
 
+@dataclass
+class RecentTicketRow:
+    id: int
+    code: str
+    title: str
+    requester_name: str
+    category_name: str | None
+    priority_name: str
+    status_name: str
+    updated_at: str 
+
 class TicketRepository:
+
+    # ==== CREACIÓN DE TICKET ====
+
     def get_categories(self):
         rows = db.session.execute(text("SELECT id, name FROM categories ORDER BY name")).mappings().all()
         return rows
@@ -66,3 +83,44 @@ class TicketRepository:
         db.session.commit()
         new_id = res.lastrowid
         return CreatedTicket(id=new_id, code=code)
+    
+    # ==== DASHBOARD MÉTRICAS ====
+
+    def kpis_for_user(self, user_id: int) -> dict:
+        sql = text("""
+        SELECT
+          SUM(CASE WHEN s.name IN ('NUEVO','ASIGNADO','EN_PROGRESO') THEN 1 ELSE 0 END) AS open_count,
+          SUM(CASE WHEN s.name = 'EN_PROGRESO' THEN 1 ELSE 0 END)                         AS in_progress_count,
+          SUM(CASE WHEN s.name = 'CERRADO' THEN 1 ELSE 0 END)                             AS closed_count
+        FROM tickets t
+        JOIN statuses s ON s.id = t.status_id
+        WHERE (t.requester_id = :uid OR t.assignee_id = :uid)
+        """)
+        row = db.session.execute(sql, {"uid": user_id}).first()
+        return {
+            "open":        int(row[0] or 0),
+            "in_progress": int(row[1] or 0),
+            "closed_week": int(row[2] or 0),  # si quieres “últimos 7 días”, ajusta el WHERE con fecha
+        }
+
+    def recent_for_user(self, user_id: int, limit: int = 10) -> list[RecentTicketRow]:
+        sql = text("""
+        SELECT  t.id,
+                t.code,
+                t.title,
+                CONCAT(rq.names_worker,' ',rq.last_name)   AS requester_name,
+                c.name                                     AS category_name,
+                p.name                                     AS priority_name,
+                s.name                                     AS status_name,
+                DATE_FORMAT(t.updated_at, '%Y-%m-%d %H:%i') AS updated_at
+        FROM tickets t
+        JOIN users rq     ON rq.id = t.requester_id
+        LEFT JOIN categories c ON c.id = t.category_id
+        JOIN priorities p ON p.id = t.priority_id
+        JOIN statuses   s ON s.id = t.status_id
+        WHERE (t.requester_id = :uid OR t.assignee_id = :uid)
+        ORDER BY t.updated_at DESC
+        LIMIT :lim
+        """)
+        rows = db.session.execute(sql, {"uid": user_id, "lim": limit}).mappings().all()
+        return [RecentTicketRow(**row) for row in rows]

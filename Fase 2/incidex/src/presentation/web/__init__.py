@@ -73,19 +73,6 @@ def create_app():
     from src.commands.seed_user import create_user_cmd
     app.cli.add_command(create_user_cmd)
 
-     # ==== current_user disponible siempre ====
-    class _Anon:
-        is_authenticated = False
-        name = None
-
-    @app.context_processor
-    def inject_current_user():
-        try:
-            from flask_login import current_user as cu
-            return {"current_user": cu}
-        except Exception:
-            return {"current_user": _Anon()}
-
     @app.route("/health")
     def health_check():
         return {"status": "ok", "service": "Incidex Web"}

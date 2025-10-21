@@ -67,14 +67,46 @@
       <section class="card -elev" aria-label="Últimos tickets">
         <header class="table-head">
           <h2 class="section__title">Últimos tickets</h2>
-          <a class="btn btn-outline" href="#">Ver todos</a>
+          <a class="btn btn-outline" href="{{ url_for('tickets.all') }}">Ver todos</a>
         </header>
 
-        <div class="empty">
-          <p>No hay tickets recientes.</p>
-          <a class="btn btn-primary" href="#">Crear tu primer ticket</a>
-        </div>
+          {% if recent_len %}
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Asunto</th>
+                  <th>Solicitante</th>
+                  <th>Categoría</th>
+                  <th>Prioridad</th>
+                  <th>Estado</th>
+                  <th>Actualizado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for t in recent %}
+                <tr>
+                  <td><a class="link" href="{{ url_for('tickets.detail', ticket_id=t.id) }}">{{ t.code }}</a></td>
+                  <td>{{ t.title }}</td>
+                  <td>{{ t.requester_name }}</td>
+                  <td>{{ t.category_name or '—' }}</td>
+                  <td>{{ t.priority_name }}</td>
+                  <td>{{ t.status_name }}</td>
+                  <td>{{ t.updated_at }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="empty">
+            <p>No hay tickets recientes.</p>
+            <a class="btn btn-primary" href="{{ url_for('tickets.create') }}">Crear tu primer ticket</a>
+          </div>
+        {% endif %}
       </section>
+
 
     </div>
   </section>

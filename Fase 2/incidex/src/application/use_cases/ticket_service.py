@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any, Dict, List
 
 @dataclass
 class CatalogsDTO:
@@ -6,6 +7,12 @@ class CatalogsDTO:
     departments: list
     priorities: list
     analysts: list
+
+@dataclass
+class KPIsDTO:
+    open: int
+    in_progress: int
+    closed_week: int
 
 class TicketService:
     def __init__(self, repo):
@@ -19,6 +26,7 @@ class TicketService:
             analysts = self.repo.get_analysts()
         )
 
+    # ======= Crear ticket =======
     def create(self, *, requester_id: int, subject: str, details: str,
                category_id: int, department_id: int, priority_id: int, assignee_id: int | None):
         code = self.repo.next_ticket_code()
@@ -33,3 +41,9 @@ class TicketService:
             assignee_id=assignee_id
         )
         return created
+    
+    def dashboard_data(self, user_id: int, limit: int = 10):
+        return {
+            "kpis": self.repo.kpis_for_user(user_id),
+            "recent": self.repo.recent_for_user(user_id, limit=limit),
+        }

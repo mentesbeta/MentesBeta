@@ -96,6 +96,16 @@
   .page-hero__title{ font-size:1.6rem; }
 }
 
+/* Tablas */
+
+.table { width:100%; border-collapse: collapse; }
+.table th, .table td { padding:10px; border-bottom:1px solid #eef2f7; text-align:left; }
+.table thead th { font-weight:800; color:#0d2847; background:#f9fbff; }
+.table a.link { color:#0d47a1; text-decoration:none; font-weight:700; }
+.table a.link:hover { text-decoration:underline; }
+.table-responsive { overflow-x:auto; }
+
+
 /* ================================================================
    Cortafuegos: evita que imágenes sueltas contaminen el dashboard
    (no afecta logo del header porque está fuera de .dashboard)
