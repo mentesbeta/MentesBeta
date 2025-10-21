@@ -10,3 +10,5 @@ PyMySQL==1.1.0
 Flask-Migrate
 Flask-WTF
 pymysql
+
+cryptography>=42

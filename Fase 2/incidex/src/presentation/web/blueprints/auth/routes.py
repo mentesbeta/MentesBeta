@@ -1,7 +1,9 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, current_user
-from src.domain.entities.user import User
 from src.infrastructure.persistence.database import db
+from src.infrastructure.persistence.database import db
+from src.infrastructure.persistence.repositories.user_repository import UserRepository
+from src.application.use_cases.auth_service import AuthService
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
@@ -20,15 +22,15 @@ def login_post():
     password = request.form.get("password", "")
     remember = bool(request.form.get("remember"))
 
-    user = User.query.filter(User.email == email, User.is_active == True).first()
-    if not user or not user.check_password(password):
+    svc = AuthService(UserRepository(db.session))
+    user = svc.authenticate(email, password)
+
+    if not user:
         flash("Correo o contraseña inválidos.", "error")
         return redirect(url_for("auth.login"))
 
     login_user(user, remember=remember)
-    #flash(f"¡Bienvenido, {user.name}!", "success")
-    next_url = request.args.get("next") or url_for("tickets.dashboard")
-    return redirect(next_url)
+    return redirect(request.args.get("next") or url_for("tickets.dashboard"))
 
 @auth_bp.post("/logout")
 def logout():

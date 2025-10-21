@@ -6,38 +6,36 @@
 {% endblock %}
 
 {% block content %}
-
-<!-- ===== Hero de página ===== -->
 <section class="page-hero -sm">
   <div class="container">
     <h1 class="page-hero__title">Crear Ticket</h1>
   </div>
 </section>
 
+<form class="ticket-wizard container" id="ticketForm"
+      method="post" action="{{ url_for('tickets.create_post') }}"
+      enctype="multipart/form-data" novalidate>
+  {{ form.csrf_token }}
 
-<!-- ===== Asistente 4 fases ===== -->
-<form class="ticket-wizard container" id="ticketForm" method="post" enctype="multipart/form-data" novalidate>
-
-  <!-- Fase 1: Información básica -->
+  <!-- Fase 1 -->
   <section class="step is-open" data-step="1">
     <button class="step__head" type="button">
-      <span>Información Básica del Ticket</span>
-      <span class="chev" aria-hidden="true">▾</span>
+      <span>Información Básica del Ticket</span><span class="chev">▾</span>
     </button>
     <div class="step__body">
-      <p class="muted">Ingresa los datos principales. Describe claramente el problema y adjunta, si es necesario, archivos de apoyo.</p>
+      <p class="muted">Ingresa los datos principales…</p>
 
       <div class="grid-2 gap-md">
         <div class="form__group">
           <label for="title">Título del ticket</label>
-          <input id="title" name="title" type="text" class="input" placeholder="Ej: No puedo iniciar sesión en correo">
+          <input id="title" name="subject" type="text" class="input" placeholder="Ej: No puedo iniciar sesión en correo" required>
         </div>
         <div></div>
 
         <div class="form__group grid-col-span-2">
           <label for="description">Descripción detallada</label>
-          <textarea id="description" name="description" class="textarea" rows="6"
-            placeholder="Describe qué ocurre con el mayor detalle posible, incluyendo mensajes de error o lo que intentaste hacer."></textarea>
+          <textarea id="description" name="details" class="textarea" rows="6"
+            placeholder="Describe con detalle…" required></textarea>
         </div>
 
         <div class="form__group grid-col-span-2">
@@ -58,48 +56,42 @@
     </div>
   </section>
 
-  <!-- Fase 2: Clasificación -->
+  <!-- Fase 2 -->
   <section class="step" data-step="2">
     <button class="step__head" type="button">
-      <span>Clasificación del ticket</span>
-      <span class="chev" aria-hidden="true">▾</span>
+      <span>Clasificación del ticket</span><span class="chev">▾</span>
     </button>
     <div class="step__body">
       <p class="muted">Selecciona cómo clasificar la incidencia.</p>
-
       <div class="grid-2 gap-md">
         <div class="form__group">
           <label for="category">Categoría</label>
-          <select id="category" name="category" class="input">
+          <select id="category" name="category_id" class="input" required>
             <option value="">Selecciona…</option>
-            <option value="correo">Correo</option>
-            <option value="hardware">Hardware</option>
-            <option value="software">Software</option>
-            <option value="red">Red</option>
+            {% for c in cats.categories %}
+              <option value="{{ c.id }}">{{ c.name }}</option>
+            {% endfor %}
           </select>
         </div>
         <div class="form__group">
           <label for="area">Área / Departamento</label>
-          <select id="area" name="area" class="input">
+          <select id="area" name="department_id" class="input" required>
             <option value="">Selecciona…</option>
-            <option value="ti">TI</option>
-            <option value="rrhh">RR.HH.</option>
-            <option value="ventas">Ventas</option>
+            {% for d in cats.departments %}
+              <option value="{{ d.id }}">{{ d.name }}</option>
+            {% endfor %}
           </select>
         </div>
-
         <div class="form__group">
           <label for="priority">Prioridad</label>
-          <select id="priority" name="priority" class="input">
+          <select id="priority" name="priority_id" class="input" required>
             <option value="">Selecciona…</option>
-            <option value="baja">Baja</option>
-            <option value="media">Media</option>
-            <option value="alta">Alta</option>
-            <option value="critica">Crítica</option>
+            {% for p in cats.priorities %}
+              <option value="{{ p.id }}">{{ p.name }}</option>
+            {% endfor %}
           </select>
         </div>
       </div>
-
       <div class="step__actions">
         <button type="button" class="btn btn-outline js-prev">Atrás</button>
         <button type="button" class="btn btn-primary js-next">Siguiente</button>
@@ -107,30 +99,32 @@
     </div>
   </section>
 
-  <!-- Fase 3: Solicitante y asignación -->
+  <!-- Fase 3 -->
   <section class="step" data-step="3">
     <button class="step__head" type="button">
-      <span>Datos del solicitante y asignación</span>
-      <span class="chev" aria-hidden="true">▾</span>
+      <span>Datos del solicitante y asignación</span><span class="chev">▾</span>
     </button>
     <div class="step__body">
-      <p class="muted">Define quién solicita el ticket y, si corresponde, a quién se asigna inicialmente.</p>
-
+      <p class="muted">Define solicitante y asignación inicial.</p>
       <div class="grid-2 gap-md">
         <div class="form__group">
           <label for="requester">Usuario solicitante</label>
-          <input id="requester" name="requester" class="input" value="{{ current_user.name if current_user else 'Usuario Prueba' }}" readonly>
+          <input id="requester" class="input" value="{{ current_user.name }}" readonly>
         </div>
         <div class="form__group">
           <label for="assignee">Asignar a</label>
-          <input id="assignee" name="assignee" class="input" placeholder="Pendiente">
+          <select id="assignee" name="assignee_id" class="input">
+            <option value="0">— Sin asignar —</option>
+            {% for a in cats.analysts %}
+              <option value="{{ a.id }}">{{ a.full_name }}</option>
+            {% endfor %}
+          </select>
         </div>
         <div class="form__group">
           <label for="initial_status">Estado inicial</label>
-          <input id="initial_status" name="initial_status" class="input" value="Nuevo" readonly>
+          <input id="initial_status" class="input" value="Nuevo" readonly>
         </div>
       </div>
-
       <div class="step__actions">
         <button type="button" class="btn btn-outline js-prev">Atrás</button>
         <button type="button" class="btn btn-primary js-next">Siguiente</button>
@@ -138,33 +132,27 @@
     </div>
   </section>
 
-  <!-- Fase 4: Confirmación y envío -->
+  <!-- Fase 4 -->
   <section class="step" data-step="4">
     <button class="step__head" type="button">
-      <span>Confirmación y envío</span>
-      <span class="chev" aria-hidden="true">▾</span>
+      <span>Confirmación y envío</span><span class="chev">▾</span>
     </button>
     <div class="step__body">
-      <p class="muted">Revisa que toda la información esté correcta antes de enviar tu ticket.</p>
-
+      <p class="muted">Revisa antes de enviar.</p>
       <div class="card">
         <div class="grid-2 gap-md">
           <div>
             <strong>Resumen</strong>
-            <div class="summary" id="summaryBox">
-              <!-- JS rellenará un resumen sencillo -->
-            </div>
+            <div class="summary" id="summaryBox"></div>
           </div>
         </div>
       </div>
-
       <div class="step__actions">
         <button type="button" class="btn btn-outline js-prev">Atrás</button>
         <button type="submit" class="btn btn-dark">Enviar</button>
       </div>
     </div>
   </section>
-
 </form>
 {% endblock %}
 
