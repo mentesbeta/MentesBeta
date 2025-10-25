@@ -88,3 +88,54 @@ class TicketService:
             ticket_id=ticket_id, uploader_id=uploader_id,
             file_storage=file_storage, upload_dir=upload_dir
         )
+    
+    # ====== Listado “Mis Tickets” ======
+    def mine_list(
+        self,
+        user_id: int,
+        *,
+        q: str | None = None,
+        status_id: int | None = None,
+        priority_id: int | None = None,
+        category_id: int | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        page: int = 1,
+        per_page: int = 10
+    ):
+        items, total = self.repo.list_mine(
+            user_id,
+            q=q,
+            status_id=status_id,
+            priority_id=priority_id,
+            category_id=category_id,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+            per_page=per_page
+        )
+        pages = max((total + per_page - 1) // per_page, 1)
+
+        catalogs = {
+            "statuses": self.repo.get_statuses(),
+            "priorities": self.repo.get_priorities(),
+            "categories": self.repo.get_categories(),
+        }
+        filters = {
+            "q": q or "",
+            "status_id": int(status_id) if status_id else None,
+            "priority_id": int(priority_id) if priority_id else None,
+            "category_id": int(category_id) if category_id else None,
+            "from": date_from or "",
+            "to": date_to or "",
+        }
+        return {
+            "items": items,
+            "total": total,
+            "page": int(page),
+            "pages": int(pages),
+            "per_page": int(per_page),
+            "filters": filters,
+            "catalogs": catalogs
+        }
+

@@ -1,0 +1,126 @@
+{% extends "_layouts/base_private.html" %}
+{% set title = "Mis Tickets" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tickets_list.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="page-hero -sm">
+  <div class="container">
+    <h1 class="page-hero__title">Mis Tickets</h1>
+    <p class="lead">Listado de tus incidencias (solicitadas o asignadas).</p>
+  </div>
+</section>
+
+<section class="section list">
+  <div class="container">
+
+    <!-- Filtros (GET) -->
+    <form class="filter-bar" method="get" action="{{ url_for('tickets.mine') }}">
+      <div>
+        <label for="q">Buscar</label><br>
+        <input id="q" name="q" class="input" type="text" value="{{ filters.q or '' }}" placeholder="#, asunto o solicitante">
+      </div>
+
+      <div>
+        <label for="status_id">Estado</label><br>
+        <select id="status_id" name="status_id" class="input">
+          <option value="">Todos</option>
+          {% for s in catalogs.statuses %}
+            <option value="{{ s.id }}" {{ 'selected' if filters.status_id==s.id else '' }}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label for="priority_id">Prioridad</label><br>
+        <select id="priority_id" name="priority_id" class="input">
+          <option value="">Todas</option>
+          {% for p in catalogs.priorities %}
+            <option value="{{ p.id }}" {{ 'selected' if filters.priority_id==p.id else '' }}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label for="category_id">Categoría</label><br>
+        <select id="category_id" name="category_id" class="input">
+          <option value="">Todas</option>
+          {% for c in catalogs.categories %}
+            <option value="{{ c.id }}" {{ 'selected' if filters.category_id==c.id else '' }}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label for="from">Desde</label><br>
+        <input id="from" name="from" class="input" type="date" value="{{ filters.from or '' }}">
+      </div>
+      <div>
+        <label for="to">Hasta</label><br>
+        <input id="to" name="to" class="input" type="date" value="{{ filters.to or '' }}">
+      </div>
+
+      <div>
+        <label>&nbsp;</label><br>
+        <button class="btn btn-primary" type="submit">Aplicar</button>
+        <a class="btn btn-outline" href="{{ url_for('tickets.mine') }}">Limpiar</a>
+      </div>
+    </form>
+
+    <!-- Tabla -->
+    <div class="card -elev">
+      {% if items %}
+      <div class="table-responsive">
+        <table class="table" aria-label="Tabla de mis tickets">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Asunto</th>
+              <th>Solicitante</th>
+              <th>Asignado a</th>
+              <th>Categoría</th>
+              <th>Prioridad</th>
+              <th>Estado</th>
+              <th>Actualizado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in items %}
+            <tr>
+              <td><a class="link" href="{{ url_for('tickets.detail', ticket_id=t.id) }}">{{ t.code }}</a></td>
+              <td>{{ t.title }}</td>
+              <td>{{ t.requester_name }}</td>
+              <td>{{ t.assignee_name or '—' }}</td>
+              <td>{{ t.category_name or '—' }}</td>
+              <td>{{ t.priority_name }}</td>
+              <td>{{ t.status_name }}</td>
+              <td>{{ t.updated_at }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Paginación -->
+      <div class="pager">
+        <span class="muted">Página {{ page }} de {{ pages }} ({{ total }} resultados)</span>
+        {% set args = request.args.to_dict() %}
+        {% if page > 1 %}
+          <a class="btn btn-outline" href="{{ url_for('tickets.mine', **(args|dict(update={'page':1}))) }}">&laquo; Primero</a>
+          <a class="btn btn-outline" href="{{ url_for('tickets.mine', **(args|dict(update={'page':page-1}))) }}">Anterior</a>
+        {% endif %}
+        {% if page < pages %}
+          <a class="btn btn-outline" href="{{ url_for('tickets.mine', **(args|dict(update={'page':page+1}))) }}">Siguiente</a>
+          <a class="btn btn-outline" href="{{ url_for('tickets.mine', **(args|dict(update={'page':pages}))) }}">Último &raquo;</a>
+        {% endif %}
+      </div>
+
+      {% else %}
+        <p class="muted">No se encontraron tickets con los criterios seleccionados.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -130,18 +130,51 @@ def download(ticket_id, att_id):
     return send_file(meta["file_path"], as_attachment=True, download_name=meta["file_name"])
 
 
-# ====== PLACEHOLDERS (para evitar errores 404/BuildError) ======
 @tickets.route('/mine', endpoint='mine')
 @login_required
 def mine():
-    return render_template('tickets/placeholder.html', title='Mis Tickets')
+    svc = TicketService(TicketRepository())
+
+    # Parámetros GET
+    q            = request.args.get("q") or None
+    status_id    = request.args.get("status_id", type=int)
+    priority_id  = request.args.get("priority_id", type=int)
+    category_id  = request.args.get("category_id", type=int)
+    date_from    = request.args.get("from") or None
+    date_to      = request.args.get("to") or None
+    page         = request.args.get("page", default=1, type=int)
+    per_page     = request.args.get("per_page", default=10, type=int)
+
+    data = svc.mine_list(
+        current_user.id,
+        q=q,
+        status_id=status_id,
+        priority_id=priority_id,
+        category_id=category_id,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        per_page=per_page
+    )
+
+    return render_template(
+        'tickets/list.html',
+        title='Mis Tickets',
+        items=data["items"],
+        total=data["total"],
+        page=data["page"],
+        pages=data["pages"],
+        per_page=data["per_page"],
+        filters=data["filters"],
+        catalogs=data["catalogs"]
+    )
+
+
+# ====== PLACEHOLDERS (para evitar errores 404/BuildError) ======
 
 @tickets.route('/reports', endpoint='reports')
 @login_required
 def reports():
     return render_template('tickets/placeholder.html', title='Reportes')
 
-@tickets.route('/all', endpoint='all')
-@login_required
-def all_tickets():
-    return render_template('tickets/placeholder.html', title='Todos los Tickets')
+

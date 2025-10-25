@@ -268,3 +268,100 @@ class TicketRepository:
             WHERE id = :id AND ticket_id = :tid
         """), {"id": att_id, "tid": ticket_id}).mappings().first()
         return row
+    
+# ===== NUEVOS MÉTODOS: catálogos para filtros =====
+    def get_statuses(self):
+        return db.session.execute(text("SELECT id, name FROM statuses ORDER BY name")).mappings().all()
+
+# ===== Listado de “Mis Tickets” con filtros y paginación =====
+    def list_mine(
+        self,
+        user_id: int,
+        *,
+        q: str | None = None,
+        status_id: int | None = None,
+        priority_id: int | None = None,
+        category_id: int | None = None,
+        date_from: str | None = None,   # 'YYYY-MM-DD'
+        date_to: str | None = None,     # 'YYYY-MM-DD'
+        page: int = 1,
+        per_page: int = 10
+    ) -> tuple[list[RecentTicketRow], int]:
+        """
+        Devuelve (items, total). Items con el mismo shape de recent_for_user.
+        Filtra por participación del usuario (requester o assignee).
+        """
+        where = ["(t.requester_id = :uid OR t.assignee_id = :uid)"]
+        params = {"uid": user_id}
+
+        if q:
+            # Busca por código exacto o por texto (FULLTEXT si aplica / fallback LIKE)
+            where.append("(t.code = :q_exact OR t.title LIKE :q_like)")
+            params["q_exact"] = q.strip()
+            params["q_like"] = f"%{q.strip()}%"
+
+        if status_id:
+            where.append("t.status_id = :status_id")
+            params["status_id"] = int(status_id)
+
+        if priority_id:
+            where.append("t.priority_id = :priority_id")
+            params["priority_id"] = int(priority_id)
+
+        if category_id:
+            where.append("t.category_id = :category_id")
+            params["category_id"] = int(category_id)
+
+        if date_from and date_to:
+            where.append("DATE(t.created_at) BETWEEN :dfrom AND :dto")
+            params["dfrom"] = date_from
+            params["dto"] = date_to
+        elif date_from:
+            where.append("DATE(t.created_at) >= :dfrom")
+            params["dfrom"] = date_from
+        elif date_to:
+            where.append("DATE(t.created_at) <= :dto")
+            params["dto"] = date_to
+
+        where_sql = " AND ".join(where)
+        limit = int(per_page or 10)
+        offset = max(int(page or 1), 1)
+        offset = (offset - 1) * limit
+
+        # total
+        sql_total = text(f"""
+            SELECT COUNT(*) FROM tickets t
+            WHERE {where_sql}
+        """)
+        total = db.session.execute(sql_total, params).scalar() or 0
+
+        # items
+        sql_items = text(f"""
+        SELECT  
+            t.id,
+            t.code,
+            t.title,
+            CONCAT(rq.names_worker,' ',rq.last_name)   AS requester_name,
+            CASE WHEN asg.id IS NULL THEN NULL ELSE CONCAT(asg.names_worker,' ',asg.last_name) END AS assignee_name,
+            c.name                                     AS category_name,
+            p.name                                     AS priority_name,
+            s.name                                     AS status_name,
+            DATE_FORMAT(t.updated_at, '%Y-%m-%d %H:%i') AS updated_at,
+            CASE
+              WHEN t.requester_id = :uid THEN 'Solicitante'
+              WHEN t.assignee_id  = :uid THEN 'Asignado'
+              ELSE ''
+            END AS role_for_user
+        FROM tickets t
+        JOIN users rq        ON rq.id = t.requester_id
+        LEFT JOIN users asg  ON asg.id = t.assignee_id
+        LEFT JOIN categories c ON c.id = t.category_id
+        JOIN priorities p    ON p.id = t.priority_id
+        JOIN statuses   s    ON s.id = t.status_id
+        WHERE {where_sql}
+        ORDER BY t.updated_at DESC
+        LIMIT :lim OFFSET :off
+        """)
+        rows = db.session.execute(sql_items, {**params, "lim": limit, "off": offset}).mappings().all()
+        items = [RecentTicketRow(**row) for row in rows]
+        return items, int(total)
