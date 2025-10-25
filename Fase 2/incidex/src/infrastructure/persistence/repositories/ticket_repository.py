@@ -1,12 +1,13 @@
 import os, hashlib
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from sqlalchemy import text, func
+from sqlalchemy import text, bindparam, Integer
 from typing import Dict, List
 from src.infrastructure.persistence.database import db
 from src.domain.entities.ticket import Ticket, Status, TicketHistory
 from src.domain.entities.ticket_extras import TicketAttachment, TicketComment
 from werkzeug.utils import secure_filename
+from typing import Sequence
 
 @dataclass
 class CreatedTicket:
@@ -19,10 +20,12 @@ class RecentTicketRow:
     code: str
     title: str
     requester_name: str
+    assignee_name: str | None
     category_name: str | None
     priority_name: str
     status_name: str
-    updated_at: str 
+    updated_at: str
+    role_for_user: str    
 
 
 @dataclass
@@ -125,25 +128,34 @@ class TicketRepository:
 
     def recent_for_user(self, user_id: int, limit: int = 10) -> list[RecentTicketRow]:
         sql = text("""
-        SELECT  t.id,
-                t.code,
-                t.title,
-                CONCAT(rq.names_worker,' ',rq.last_name)   AS requester_name,
-                c.name                                     AS category_name,
-                p.name                                     AS priority_name,
-                s.name                                     AS status_name,
-                DATE_FORMAT(t.updated_at, '%Y-%m-%d %H:%i') AS updated_at
+        SELECT  
+            t.id,
+            t.code,
+            t.title,
+            CONCAT(rq.names_worker,' ',rq.last_name)   AS requester_name,
+            CONCAT(asg.names_worker,' ',asg.last_name) AS assignee_name,
+            c.name                                     AS category_name,
+            p.name                                     AS priority_name,
+            s.name                                     AS status_name,
+            DATE_FORMAT(t.updated_at, '%Y-%m-%d %H:%i') AS updated_at,
+            CASE
+            WHEN t.requester_id = :uid THEN 'Solicitante'
+            WHEN t.assignee_id  = :uid THEN 'Asignado'
+            ELSE ''
+            END AS role_for_user
         FROM tickets t
-        JOIN users rq     ON rq.id = t.requester_id
+        JOIN users rq        ON rq.id = t.requester_id
+        LEFT JOIN users asg  ON asg.id = t.assignee_id
         LEFT JOIN categories c ON c.id = t.category_id
-        JOIN priorities p ON p.id = t.priority_id
-        JOIN statuses   s ON s.id = t.status_id
+        JOIN priorities p    ON p.id = t.priority_id
+        JOIN statuses   s    ON s.id = t.status_id
         WHERE (t.requester_id = :uid OR t.assignee_id = :uid)
         ORDER BY t.updated_at DESC
         LIMIT :lim
         """)
         rows = db.session.execute(sql, {"uid": user_id, "lim": limit}).mappings().all()
         return [RecentTicketRow(**row) for row in rows]
+
     
     # ===== DETALLE =====
     def detail(self, ticket_id: int):

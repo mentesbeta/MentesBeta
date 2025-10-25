@@ -44,7 +44,7 @@
       </div>
 
 
-      <!-- Filtro simple -->
+      <!-- Filtro simple 
       <form class="filter" role="search" method="get" action="#">
           <input class="input" type="text" name="q" placeholder="Buscar por #, asunto o solicitante…">
           <select class="input" name="status">
@@ -54,14 +54,13 @@
             <option value="closed">Cerrado</option>
           </select>
           <button class="btn btn-primary" type="submit">Filtrar</button>
-        </form>
+        </form>-->
 
-      <!-- Acciones rápidas -->
+      <!-- Acciones rápidas 
       <div class="quick-actions" aria-label="Accesos rápidos">
         <a class="btn btn-primary" href="{{ url_for('tickets.create') }}">Nuevo ticket</a>
         <a class="btn btn-outline" href="#">Mis tickets</a>
-        <a class="btn btn-outline" href="#">Reporte</a>
-      </div>
+      </div>-->
 
     
       <!-- Últimos tickets -->
@@ -79,9 +78,11 @@
                   <th>#</th>
                   <th>Asunto</th>
                   <th>Solicitante</th>
+                  <th>Asignado a</th>
                   <th>Categoría</th>
                   <th>Prioridad</th>
                   <th>Estado</th>
+                  <th>Rol</th> 
                   <th>Actualizado</th>
                 </tr>
               </thead>
@@ -91,9 +92,11 @@
                   <td><a class="link" href="{{ url_for('tickets.detail', ticket_id=t.id) }}">{{ t.code }}</a></td>
                   <td>{{ t.title }}</td>
                   <td>{{ t.requester_name }}</td>
+                  <td>{{ t.assignee_name or '—' }}</td> 
                   <td>{{ t.category_name or '—' }}</td>
                   <td>{{ t.priority_name }}</td>
                   <td>{{ t.status_name }}</td>
+                  <td>{{ t.role_for_user }}</td>
                   <td>{{ t.updated_at }}</td>
                 </tr>
                 {% endfor %}
