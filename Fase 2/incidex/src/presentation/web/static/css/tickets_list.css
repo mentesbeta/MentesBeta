@@ -22,3 +22,5 @@
 .pager{ display:flex; gap:8px; align-items:center; justify-content:flex-end; margin-top:12px; flex-wrap:wrap; }
 .pager .btn{ padding:.45rem .7rem; border-radius:8px; }
 .pager .muted{ color:#5d6b7c; }
+
+.stack section.card h3 { margin-top: 0; }

@@ -15,7 +15,7 @@ def dashboard():
     svc = TicketService(TicketRepository())
 
     # Obtener los datos del dashboard
-    data = svc.dashboard_data(current_user.id, limit=10)
+    data = svc.dashboard_data(current_user.id, limit=5)
     recent = list(data["recent"])
     # Renderizar la vista
     return render_template(
@@ -67,17 +67,107 @@ def create_post():
     return redirect(url_for('tickets.dashboard'))
 
 
-# ===== DETALLE =====
+# ===== DETALLE CON CAMBIOS DE ESTADO Y ASIGNAR =====
 @tickets.get('/detail/<int:ticket_id>', endpoint='detail')
 @login_required
-def detail(ticket_id):
+def detail(ticket_id: int):
     svc = TicketService(TicketRepository())
-    # roles del usuario (nombres) — si no tienes un servicio, puedes sacarlos rápido
     roles = [r.name for r in getattr(current_user, "roles", [])] if hasattr(current_user, "roles") else []
     bundle = svc.detail(ticket_id, viewer_id=current_user.id, viewer_roles=roles)
     if not bundle:
         abort(404)
-    return render_template('tickets/detail.html', title=f"{bundle.ticket['code']}", **bundle.__dict__)
+
+    repo = TicketRepository()
+    statuses = repo.get_statuses()
+    tmin = repo.get_ticket_minimal(ticket_id)
+    current_status_id = tmin["status_id"] if tmin else None
+    current_assignee_id = tmin["assignee_id"] if tmin else None
+
+    # Aquí cambiamos: lista de asignables = REQUESTER del mismo depto del actor
+    assignables = repo.list_assignable_requesters_same_dept(current_user.id)
+
+    return render_template(
+        'tickets/detail.html',
+        title=f'{bundle.ticket["code"]} · {bundle.ticket["title"]}',
+        ticket=bundle.ticket,
+        comments=bundle.comments,
+        attachments=bundle.attachments,
+        history=bundle.history,
+        can_act=bundle.can_act,
+        statuses=statuses,
+        current_status_id=current_status_id,
+        current_assignee_id=current_assignee_id,
+        assignables=assignables
+    )
+
+
+@tickets.post('/detail/<int:ticket_id>/status', endpoint='change_status')
+@login_required
+def change_status(ticket_id: int):
+    print("Dentro!!")
+    svc = TicketService(TicketRepository())
+    roles = [r.name for r in getattr(current_user, "roles", [])] if hasattr(current_user, "roles") else []
+    bundle = svc.detail(ticket_id, viewer_id=current_user.id, viewer_roles=roles)
+    if not bundle:
+        abort(404)
+    if not bundle.can_act:
+        abort(403)
+
+    to_status_id = request.form.get("to_status_id", type=int)
+    note = request.form.get("note", "")
+
+    if not to_status_id:
+        print("Selecciona un estado válido.", "error")
+        return redirect(url_for('tickets.detail', ticket_id=ticket_id))
+
+    try:
+        svc.change_status(
+            ticket_id=ticket_id,
+            actor_id=current_user.id,
+            actor_roles=roles,
+            to_status_id=to_status_id,
+            note=note
+        )
+        print("Estado actualizado y registrado en el historial.", "ok")
+    except PermissionError as e:
+        print(str(e), "error")
+        return abort(403)
+    except Exception as e:
+        print(str(e), "error")
+        print("No se pudo cambiar el estado.", "error")
+
+    return redirect(url_for('tickets.detail', ticket_id=ticket_id))
+
+@tickets.post('/detail/<int:ticket_id>/assign', endpoint='assign')
+@login_required
+def assign(ticket_id: int):
+    svc = TicketService(TicketRepository())
+    roles = [r.name for r in getattr(current_user, "roles", [])] if hasattr(current_user, "roles") else []
+    bundle = svc.detail(ticket_id, viewer_id=current_user.id, viewer_roles=roles)
+    if not bundle:
+        abort(404)
+    if not bundle.can_act:
+        abort(403)
+
+    new_assignee_id = request.form.get("assignee_id", type=int)
+    note = request.form.get("note", "")
+
+    try:
+        svc.reassign(
+            ticket_id=ticket_id,
+            actor_id=current_user.id,
+            actor_roles=roles,
+            new_assignee_id=new_assignee_id,
+            note=note
+        )
+        flash("Asignación actualizada.", "success")
+    except PermissionError as e:
+        flash(str(e), "error")
+        return abort(403)
+    except Exception:
+        flash("No se pudo actualizar la asignación.", "error")
+
+    return redirect(url_for('tickets.detail', ticket_id=ticket_id))
 
 # ===== COMENTAR =====
 @tickets.post('/detail/<int:ticket_id>/comment', endpoint='comment')

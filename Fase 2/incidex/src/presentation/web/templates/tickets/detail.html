@@ -28,7 +28,7 @@
     </div>
 
     <div class="grid-2 gap-md">
-      <!-- Conversación -->
+      <!-- Conversación (col izquierda) -->
       <section class="card">
         <h3>Conversación</h3>
         <article class="ticket-body">
@@ -58,28 +58,84 @@
         {% endif %}
       </section>
 
-      <!-- Adjuntos -->
-      <section class="card">
-        <h3>Adjuntos</h3>
-        <ul class="attachments">
-          {% for a in attachments %}
-            <li>
-              <a class="link" href="{{ url_for('tickets.download', ticket_id=ticket.id, att_id=a.id) }}">{{ a.file_name }}</a>
-              <span class="muted">({{ a.file_size }} bytes · {{ a.created_at }})</span>
-            </li>
-          {% else %}
-            <li class="muted">Sin archivos.</li>
-          {% endfor %}
-        </ul>
-
+      <div class="stack">
         {% if can_act %}
-        <form action="{{ url_for('tickets.upload', ticket_id=ticket.id) }}" method="post" enctype="multipart/form-data" class="upload-form">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="file" name="file" required>
-          <button class="btn btn-outline" type="submit">Subir</button>
-        </form>
+
+        <!-- ===== Cambio Estado ===== -->
+        <section class="card" aria-label="Cambiar estado">
+          <h3>Cambiar estado</h3>
+          <form id="stateForm" action="{{ url_for('tickets.change_status', ticket_id=ticket.id) }}" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" id="hidden_to_status_id" name="to_status_id">
+            <input type="hidden" id="hidden_note" name="note">
+
+            <div class="form__group">
+              <label for="to_status_id_select"></label>
+              <select id="to_status_id_select" class="input" required
+                      data-prev="{{ current_status_id or '' }}">
+                <option value="">Selecciona…</option>
+                {% for s in statuses %}
+                  <option value="{{ s.id }}" {{ 'selected' if current_status_id==s.id else '' }}>
+                    {{ s.name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            {# Sin botón; el modal se abre al cambiar el select #}
+          </form>
+        </section>
+
+        <!-- ===== Asignar a ===== -->
+        <section class="card" aria-label="Asignar a">
+          <h3>Asignar a</h3>
+          <form id="assignForm" action="{{ url_for('tickets.assign', ticket_id=ticket.id) }}" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" id="hidden_assignee_id" name="assignee_id">
+            <input type="hidden" id="hidden_assign_note" name="note">
+
+            <div class="form__group">
+              <label for="assignee_id_select">Seleccionar persona</label>
+              <select id="assignee_id_select" class="input" required
+                      data-prev="{{ current_assignee_id or '' }}">
+                <option value="">— Selecciona —</option>
+                {% for u in assignables %}
+                  <option value="{{ u.id }}" {{ 'selected' if current_assignee_id==u.id else '' }}>
+                    {{ u.full_name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            {# Sin botón; el modal se abre al cambiar el select #}
+          </form>
+        </section>
         {% endif %}
-      </section>
+
+        <!-- Adjuntos (debajo) -->
+        <section class="card">
+          <h3>Adjuntos</h3>
+          <ul class="attachments">
+            {% for a in attachments %}
+              <li>
+                <a class="link" href="{{ url_for('tickets.download', ticket_id=ticket.id, att_id=a.id) }}">{{ a.file_name }}</a>
+                <span class="muted">({{ a.file_size }} bytes · {{ a.created_at }})</span>
+              </li>
+            {% else %}
+              <li class="muted">Sin archivos.</li>
+            {% endfor %}
+          </ul>
+
+          {% if can_act %}
+          <form action="{{ url_for('tickets.upload', ticket_id=ticket.id) }}" method="post" enctype="multipart/form-data" class="upload-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input id="fileInput" type="file" name="file" class="file-input-hidden" required>
+            <label for="fileInput" class="btn btn-outline btn-file">Adjuntar archivo</label>
+            <button class="btn btn-primary btn-upload" type="submit">Subir</button>
+            <ul id="uploadFiles" class="file-list" aria-live="polite"></ul>
+          </form>
+          {% endif %}
+        </section>
+      </div>
+
     </div>
 
     <!-- Historial -->
@@ -102,4 +158,48 @@
 
   </div>
 </section>
+
+<!-- ========= Modal Nota (tipo Jira) ========= -->
+<div id="noteModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="noteTitle" hidden>
+  <div class="modal__backdrop"></div>
+  <div class="modal__dialog">
+    <header class="modal__header">
+      <h3 id="noteTitle">Agregar nota al cambio de estado</h3>
+      <button type="button" class="modal__close" aria-label="Cerrar">×</button>
+    </header>
+    <div class="modal__body">
+      <p class="muted">Opcional: explica brevemente el motivo del cambio.</p>
+      <input id="noteInput" type="text" class="input" placeholder="Motivo o comentario (opcional)">
+    </div>
+    <footer class="modal__footer">
+      <button type="button" class="btn btn-outline modal__cancel">Cancelar</button>
+      <button type="button" class="btn btn-primary modal__confirm">Confirmar cambio</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ========= Modal Nota para Asignación ========= -->
+<div id="assignModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="assignTitle" hidden>
+  <div class="modal__backdrop"></div>
+  <div class="modal__dialog">
+    <header class="modal__header">
+      <h3 id="assignTitle">Agregar nota a la reasignación</h3>
+      <button type="button" class="modal__close" aria-label="Cerrar">×</button>
+    </header>
+    <div class="modal__body">
+      <p class="muted">Opcional: explica brevemente el motivo del cambio de asignación.</p>
+      <input id="assignNoteInput" type="text" class="input" placeholder="Motivo o comentario (opcional)">
+    </div>
+    <footer class="modal__footer">
+      <button type="button" class="btn btn-outline assign__cancel">Cancelar</button>
+      <button type="button" class="btn btn-primary assign__confirm">Confirmar reasignación</button>
+    </footer>
+  </div>
+</div>
+
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/tickets_detail.js') }}"></script>
 {% endblock %}

@@ -126,7 +126,7 @@ class TicketRepository:
             "closed_week": int(row[2] or 0),  # si quieres “últimos 7 días”, ajusta el WHERE con fecha
         }
 
-    def recent_for_user(self, user_id: int, limit: int = 10) -> list[RecentTicketRow]:
+    def recent_for_user(self, user_id: int, limit: int = 5) -> list[RecentTicketRow]:
         sql = text("""
         SELECT  
             t.id,
@@ -365,3 +365,180 @@ class TicketRepository:
         rows = db.session.execute(sql_items, {**params, "lim": limit, "off": offset}).mappings().all()
         items = [RecentTicketRow(**row) for row in rows]
         return items, int(total)
+    
+# ===== para permisos / estado actual =====
+    def get_ticket_minimal(self, ticket_id: int):
+        row = db.session.execute(text("""
+            SELECT id, assignee_id, status_id
+            FROM tickets
+            WHERE id = :tid
+        """), {"tid": ticket_id}).mappings().first()
+        return row  # dict-like: {"id":..,"assignee_id":..,"status_id":..}
+
+
+# ===== Actualizar estado + historial =====
+    def update_status_with_history(
+        self,
+        *,
+        ticket_id: int,
+        to_status_id: int,
+        actor_user_id: int,
+        note: str | None = None
+    ):
+        try:
+            # 1) Lock de la fila (InnoDB) para leer el estado actual
+            cur = db.session.execute(text("""
+                SELECT status_id
+                FROM tickets
+                WHERE id = :tid
+                FOR UPDATE
+            """), {"tid": ticket_id}).first()
+            if not cur:
+                raise ValueError("Ticket no encontrado")
+
+            from_status_id = int(cur[0])
+
+            # 2) Actualizar estado
+            db.session.execute(text("""
+                UPDATE tickets
+                SET status_id = :to_status_id,
+                    updated_at = NOW()
+                WHERE id = :tid
+            """), {"to_status_id": int(to_status_id), "tid": ticket_id})
+
+            # 3) Insertar historial
+            db.session.execute(text("""
+                INSERT INTO ticket_history
+                    (ticket_id, actor_user_id, from_status_id, to_status_id, note, created_at)
+                VALUES
+                    (:tid, :actor, :froms, :tos, :note, NOW())
+            """), {
+                "tid": ticket_id,
+                "actor": actor_user_id,
+                "froms": from_status_id,
+                "tos": int(to_status_id),
+                "note": (note or "").strip() or None
+            })
+
+            # 4) Commit al final (sin begin explícito)
+            db.session.commit()
+
+        except Exception:
+            db.session.rollback()
+            raise
+
+    # ASIGNAR       
+
+    def get_user_fullname(self, user_id: int | None) -> str | None:
+        if not user_id:
+            return None
+        row = db.session.execute(text("""
+            SELECT CONCAT(u.names_worker,' ',u.last_name) AS full_name
+            FROM users u WHERE u.id = :uid
+        """), {"uid": user_id}).first()
+        return row[0] if row else None
+
+    def update_assignee_with_history(
+        self,
+        *,
+        ticket_id: int,
+        new_assignee_id: int | None,
+        actor_user_id: int,
+        note: str | None = None
+    ):
+        """
+        Cambia el asignado y registra un evento en ticket_history.
+        Mantiene from_status_id = to_status_id (no cambiamos estado).
+        """
+        try:
+            # Lock de la fila: obtenemos status y asignado actual
+            cur = db.session.execute(text("""
+                SELECT status_id, assignee_id
+                FROM tickets
+                WHERE id = :tid
+                FOR UPDATE
+            """), {"tid": ticket_id}).first()
+            if not cur:
+                raise ValueError("Ticket no encontrado")
+
+            current_status_id = int(cur[0])
+            old_assignee_id = cur[1]
+
+            # Nombres para la nota
+            old_name = self.get_user_fullname(old_assignee_id) or "—"
+            new_name = self.get_user_fullname(new_assignee_id) or "—"
+
+            note_parts = []
+            note_parts.append(f"Reasignado de {old_name} a {new_name}")
+            if (note or "").strip():
+                note_parts.append((note or "").strip())
+            final_note = " — ".join(note_parts)
+
+            # Update asignado
+            db.session.execute(text("""
+                UPDATE tickets
+                SET assignee_id = :new_assignee,
+                    updated_at  = NOW()
+                WHERE id = :tid
+            """), {"new_assignee": new_assignee_id, "tid": ticket_id})
+
+            # Historial (misma transición de estado, solo nota)
+            db.session.execute(text("""
+                INSERT INTO ticket_history
+                    (ticket_id, actor_user_id, from_status_id, to_status_id, note, created_at)
+                VALUES
+                    (:tid, :actor, :froms, :tos, :note, NOW())
+            """), {
+                "tid": ticket_id,
+                "actor": actor_user_id,
+                "froms": current_status_id,
+                "tos": current_status_id,
+                "note": final_note
+            })
+
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+
+    def get_user_department_id(self, user_id: int) -> int | None:
+            row = db.session.execute(text("""
+                SELECT department_id FROM users WHERE id = :uid
+            """), {"uid": user_id}).first()
+            return row[0] if row else None
+
+    def list_assignable_requesters_same_dept(self, actor_user_id: int):
+        """
+        Devuelve usuarios REQUESTER del mismo departamento del actor.
+        """
+        dept = self.get_user_department_id(actor_user_id)
+        if dept is None:
+            return []
+
+        rows = db.session.execute(text("""
+            SELECT u.id,
+                   CONCAT(u.names_worker,' ',u.last_name) AS full_name
+            FROM users u
+            JOIN user_roles ur ON ur.user_id = u.id
+            JOIN roles r       ON r.id = ur.role_id
+            WHERE u.department_id = :dept
+              AND UPPER(r.name) = 'REQUESTER'
+            ORDER BY full_name
+        """), {"dept": dept}).mappings().all()
+        return rows  # [{id, full_name}, ...]
+
+    def is_requester_same_dept(self, actor_user_id: int, target_user_id: int) -> bool:
+        """
+        ¿El target tiene rol REQUESTER y pertenece al mismo depto que el actor?
+        """
+        rows = db.session.execute(text("""
+            SELECT 1
+            FROM users ta
+            JOIN user_roles ur ON ur.user_id = ta.id
+            JOIN roles r       ON r.id = ur.role_id
+            WHERE ta.id = :target
+              AND ta.department_id = (SELECT department_id FROM users WHERE id = :actor)
+              AND UPPER(r.name) = 'REQUESTER'
+            LIMIT 1
+        """), {"actor": actor_user_id, "target": target_user_id}).all()
+        return bool(rows)
