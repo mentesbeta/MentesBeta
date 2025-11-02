@@ -3,12 +3,26 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/tickets.css') }}">
+<style>
+  /* Chips de archivos a adjuntar */
+  .file-list { list-style:none; padding:0; margin:.35rem 0 0; display:flex; flex-wrap:wrap; gap:8px; }
+  .file-chip { display:inline-flex; align-items:center; gap:6px; padding:.35rem .55rem; border-radius:999px;
+               background:#eef4ff; border:1px solid #cfe0ff; color:#0b2f69; font-size:.9rem; }
+  .file-chip .remove { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px;
+                       border-radius:50%; background:#0b2f69; color:#fff; font-weight:700; line-height:1;
+                       cursor:pointer; border:0; }
+  .file-chip .remove:hover { filter:brightness(1.1); }
+
+  /* Select deshabilitado (solo visual) */
+  .input.-readonly { background:#f7f7f9; color:#6b7280; pointer-events:none; }
+</style>
 {% endblock %}
 
 {% block content %}
 <section class="page-hero -sm">
   <div class="container">
     <h1 class="page-hero__title">Crear Ticket</h1>
+    <p class="lead">Crea tu ticket de manera rapida e inteligente</p>
   </div>
 </section>
 
@@ -38,13 +52,12 @@
             placeholder="Describe con detalle…" required></textarea>
         </div>
 
+        <!-- Adjuntos con previsualización y eliminar -->
         <div class="form__group grid-col-span-2">
           <div class="form__row between">
             <label>Archivos adjuntos</label>
-            <label class="btn btn-dark btn-sm">
-              Adjuntar
-              <input id="files" name="files" type="file" multiple hidden>
-            </label>
+            <label class="btn btn-dark btn-sm" for="files">Adjuntar</label>
+            <input id="files" name="files" type="file" multiple hidden>
           </div>
           <ul id="fileList" class="file-list" aria-live="polite"></ul>
         </div>
@@ -109,20 +122,32 @@
       <div class="grid-2 gap-md">
         <div class="form__group">
           <label for="requester">Usuario solicitante</label>
-          <input id="requester" class="input" value="{{ current_user.name }}" readonly>
+          <!-- Usuario solicitante -->
+          <input id="requester" class="input -readonly" value="{{ current_user.name }}" readonly>
         </div>
+
+        <!-- Asignar a: deshabilitado + hidden para enviar -->
         <div class="form__group">
-          <label for="assignee">Asignar a</label>
-          <select id="assignee" name="assignee_id" class="input">
+          <label for="assignee_display">Asignar a</label>
+          <select id="assignee_display" class="input -readonly" disabled>
             <option value="0">— Sin asignar —</option>
             {% for a in cats.analysts %}
-              <option value="{{ a.id }}">{{ a.full_name }}</option>
+              <option value="{{ a.id }}"
+                      {% if a.id == 0 %}selected{% endif %}
+                      data-dept="{{ a.department_id if a.department_id is defined else '' }}">
+                {{ a.full_name }}
+              </option>
             {% endfor %}
           </select>
+          <!-- el valor real que se envía -->
+          <input type="hidden" id="assignee" name="assignee_id" value="0">
+          <small class="muted">Se autocompletará según el Área/Departamento seleccionado.</small>
         </div>
+
         <div class="form__group">
           <label for="initial_status">Estado inicial</label>
-          <input id="initial_status" class="input" value="Nuevo" readonly>
+          <!-- Estado inicial -->
+          <input id="initial_status" class="input -readonly" value="Nuevo" readonly>
         </div>
       </div>
       <div class="step__actions">
@@ -159,3 +184,4 @@
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/tickets.js') }}"></script>
 {% endblock %}
+

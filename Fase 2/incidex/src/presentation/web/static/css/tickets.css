@@ -53,3 +53,22 @@
 
 /* Resumen */
 .summary{ padding:.6rem .8rem; border:1px dashed #c9d7ea; border-radius:10px; background:#fbfdff; color:#334155; line-height:1.45; }
+
+/* Estado visual para inputs de solo lectura / deshabilitados */
+.input.-readonly,
+.input[readonly],
+.textarea[readonly],
+select.-readonly,
+select:disabled {
+  background: #f3f4f6;   /* plomo claro */
+  color: #6b7280;        /* texto plomo */
+  border-color: #e5e7eb; /* borde suave */
+  pointer-events: none;  /* no interactuable */
+  cursor: not-allowed;
+}
+
+.input.-readonly::placeholder,
+.input[readonly]::placeholder {
+  color: #9ca3af;        /* placeholder más tenue */
+}
+

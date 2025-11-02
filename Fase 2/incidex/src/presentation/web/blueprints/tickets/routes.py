@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file, abort, jsonify
 from flask_login import login_required, current_user
 
 from src.presentation.web.blueprints.tickets.forms import TicketCreateForm
@@ -44,27 +44,49 @@ def create_get():
     cats = _bind_choices(form, svc)
     return render_template('tickets/create.html', title='Crear Ticket', form=form, cats=cats)
 
+
+@tickets.get("/analysts/by-dept")
+@login_required
+def api_analysts_by_dept():
+    svc = TicketService(TicketRepository())
+    return jsonify(svc.analysts_by_dept_map())
+
+
 # ======== CREATE (POST) ========
-@tickets.post('/tickets/create', endpoint='create_post')
+@tickets.post('/create', endpoint='create_post')
 @login_required
 def create_post():
     svc = TicketService(TicketRepository())
-    form = TicketCreateForm()
-    cats = _bind_choices(form, svc)
 
-    if not form.validate_on_submit():
-        return render_template('tickets/create.html', title='Crear Ticket', form=form, cats=cats), 400
+    subject        = (request.form.get('subject') or '').strip()
+    details        = (request.form.get('details') or '').strip()
+    category_id    = request.form.get('category_id', type=int)
+    department_id  = request.form.get('department_id', type=int)
+    priority_id    = request.form.get('priority_id', type=int)
+    assignee_id    = request.form.get('assignee_id', type=int)  # puede venir 0
 
-    created = svc.create(
-        requester_id=current_user.id,
-        subject=form.subject.data,
-        details=form.details.data,
-        category_id=form.category_id.data,
-        department_id=form.department_id.data,
-        priority_id=form.priority_id.data,
-        assignee_id=form.assignee_id.data,
-    )
-    return redirect(url_for('tickets.dashboard'))
+    # Fallback de autoasignación en backend
+    if (not assignee_id) and department_id:
+        abd = svc.analysts_by_dept_map()
+        lst = abd.get(int(department_id), [])
+        if lst:
+            assignee_id = int(lst[0]['id'])  # toma el primero pero revisemos si luego lo cambio
+
+    try:
+        created = svc.create(
+            requester_id=current_user.id,
+            subject=subject,
+            details=details,
+            category_id=category_id,
+            department_id=department_id,
+            priority_id=priority_id,
+            assignee_id=assignee_id if assignee_id else None
+        )
+        return redirect(url_for('tickets.detail', ticket_id=created.id))
+    except Exception as e:
+        current_app.logger.exception("Error creando ticket")
+        return redirect(url_for('tickets.create'))
+
 
 
 # ===== DETALLE CON CAMBIOS DE ESTADO Y ASIGNAR =====
@@ -83,8 +105,13 @@ def detail(ticket_id: int):
     current_status_id = tmin["status_id"] if tmin else None
     current_assignee_id = tmin["assignee_id"] if tmin else None
 
-    # Aquí cambiamos: lista de asignables = REQUESTER del mismo depto del actor
-    assignables = repo.list_assignable_requesters_same_dept(current_user.id)
+    roles_up = {(r or "").upper() for r in roles}
+    is_admin = "ADMIN" in roles_up
+    is_analyst = "ANALYST" in roles_up
+    is_request = "REQUESTER" in roles_up
+    is_assignee = (current_assignee_id == current_user.id)
+
+    assignables = repo.list_assignables_for_actor(current_user.id, roles_up)
 
     return render_template(
         'tickets/detail.html',
@@ -97,14 +124,18 @@ def detail(ticket_id: int):
         statuses=statuses,
         current_status_id=current_status_id,
         current_assignee_id=current_assignee_id,
-        assignables=assignables
+        assignables=assignables,
+        is_admin=is_admin,
+        is_analyst=is_analyst,
+        is_request=is_request,
+        is_assignee=is_assignee,
     )
+
 
 
 @tickets.post('/detail/<int:ticket_id>/status', endpoint='change_status')
 @login_required
 def change_status(ticket_id: int):
-    print("Dentro!!")
     svc = TicketService(TicketRepository())
     roles = [r.name for r in getattr(current_user, "roles", [])] if hasattr(current_user, "roles") else []
     bundle = svc.detail(ticket_id, viewer_id=current_user.id, viewer_roles=roles)
@@ -160,12 +191,11 @@ def assign(ticket_id: int):
             new_assignee_id=new_assignee_id,
             note=note
         )
-        flash("Asignación actualizada.", "success")
     except PermissionError as e:
-        flash(str(e), "error")
+        print(str(e), "error")
         return abort(403)
     except Exception:
-        flash("No se pudo actualizar la asignación.", "error")
+        print("No se pudo actualizar la asignación.", "error")
 
     return redirect(url_for('tickets.detail', ticket_id=ticket_id))
 
@@ -183,9 +213,9 @@ def add_comment(ticket_id):
 
     try:
         svc.add_comment(ticket_id, current_user.id, request.form.get("body", ""))
-        flash("Comentario agregado.", "success")
+        print("Comentario agregado.", "success")
     except ValueError as e:
-        flash(str(e), "error")
+        print(str(e), "error")
     return redirect(url_for('tickets.detail', ticket_id=ticket_id))
 
 # ===== ADJUNTAR ARCHIVO =====
@@ -235,21 +265,26 @@ def mine():
     page         = request.args.get("page", default=1, type=int)
     per_page     = request.args.get("per_page", default=10, type=int)
 
-    data = svc.mine_list(
-        current_user.id,
-        q=q,
-        status_id=status_id,
-        priority_id=priority_id,
-        category_id=category_id,
-        date_from=date_from,
-        date_to=date_to,
-        page=page,
-        per_page=per_page
+    roles = [r.name for r in getattr(current_user, "roles", [])] if hasattr(current_user, "roles") else []
+
+    data = svc.scoped_list(
+        current_user.id, roles,
+        q=q, status_id=status_id, priority_id=priority_id, category_id=category_id,
+        date_from=date_from, date_to=date_to, page=page, per_page=per_page
     )
+
+    # título según rol
+    roles_up = {(r or "").upper() for r in roles}
+    if "ADMIN" in roles_up:
+        page_title = "Todos los tickets"
+    elif "ANALYST" in roles_up:
+        page_title = "Tickets del departamento y propios"
+    else:
+        page_title = "Mis Tickets (creados o asignados)"
 
     return render_template(
         'tickets/list.html',
-        title='Mis Tickets',
+        title=page_title,
         items=data["items"],
         total=data["total"],
         page=data["page"],
@@ -258,6 +293,7 @@ def mine():
         filters=data["filters"],
         catalogs=data["catalogs"]
     )
+
 
 
 # ====== PLACEHOLDERS (para evitar errores 404/BuildError) ======

@@ -46,7 +46,7 @@ INSERT IGNORE INTO priorities (name, sla_hours) VALUES
   ('ALTA', 24), ('MEDIA', 72), ('BAJA', 120);
 
 INSERT IGNORE INTO statuses (name, is_terminal) VALUES
-  ('NUEVO', 0), ('ASIGNADO', 0), ('EN_PROGRESO', 0), ('RESUELTO', 0), ('CERRADO', 1);
+  ('NUEVO', 0), ('ASIGNADO', 0), ('EN_PROGRESO', 0), ('RESUELTO', 0), ('CERRADO', 1), ('RECHAZADO', 1);
 
 INSERT IGNORE INTO categories (name, description) VALUES
   ('Hardware', 'Equipos y periféricos'),

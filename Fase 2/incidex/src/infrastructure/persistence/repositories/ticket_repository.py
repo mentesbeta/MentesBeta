@@ -1,13 +1,10 @@
 import os, hashlib
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from sqlalchemy import text, bindparam, Integer
-from typing import Dict, List
+from sqlalchemy import text
 from src.infrastructure.persistence.database import db
 from src.domain.entities.ticket import Ticket, Status, TicketHistory
 from src.domain.entities.ticket_extras import TicketAttachment, TicketComment
 from werkzeug.utils import secure_filename
-from typing import Sequence
 
 @dataclass
 class CreatedTicket:
@@ -25,8 +22,7 @@ class RecentTicketRow:
     priority_name: str
     status_name: str
     updated_at: str
-    role_for_user: str    
-
+    role_for_user: str | None = None
 
 @dataclass
 class TicketDetail:
@@ -44,55 +40,98 @@ class TicketDetail:
     created_at: str
     updated_at: str
 
+def _coalesce_int(v, default=None):
+    try:
+        return int(v) if v is not None else default
+    except Exception:
+        return default
+
 class TicketRepository:
 
-    # ==== CREACIÓN DE TICKET ====
-
+    # ==== CATÁLOGOS BÁSICOS ====
     def get_categories(self):
-        rows = db.session.execute(text("SELECT id, name FROM categories ORDER BY name")).mappings().all()
-        return rows
+        return db.session.execute(text("SELECT id, name FROM categories ORDER BY name")).mappings().all()
 
     def get_departments(self):
-        rows = db.session.execute(text("SELECT id, name FROM departments ORDER BY name")).mappings().all()
-        return rows
+        return db.session.execute(text("SELECT id, name FROM departments ORDER BY name")).mappings().all()
 
     def get_priorities(self):
-        rows = db.session.execute(text("SELECT id, name FROM priorities ORDER BY name")).mappings().all()
-        return rows
+        return db.session.execute(text("SELECT id, name FROM priorities ORDER BY name")).mappings().all()
+
+    def get_statuses(self):
+        return db.session.execute(text("SELECT id, name FROM statuses ORDER BY name")).mappings().all()
+    
+    def get_status_name(self, status_id: int) -> str | None:
+        """
+        Devuelve el nombre del estado (ej. 'EN_PROGRESO') dado su ID.
+        """
+        row = db.session.execute(
+            text("SELECT name FROM statuses WHERE id = :i LIMIT 1"),
+            {"i": int(status_id)}
+        ).scalar()
+        return row if row is not None else None
+
+
+    def get_status_id_by_name(self, name: str) -> int | None:
+        row = db.session.execute(
+            text("SELECT id FROM statuses WHERE UPPER(name) = UPPER(:n) LIMIT 1"),
+            {"n": (name or "").strip()}
+        ).scalar()
+        return int(row) if row is not None else None
+
 
     def get_analysts(self):
-        # usuarios con rol ANALYST
         sql = """
         SELECT u.id, CONCAT(u.names_worker, ' ', u.last_name) AS full_name
         FROM users u
         JOIN user_roles ur ON ur.user_id = u.id
         JOIN roles r       ON r.id = ur.role_id
-        WHERE r.name = 'ANALYST' AND u.is_active = 1
+        WHERE UPPER(r.name) = 'ANALYST' AND u.is_active = 1
         ORDER BY full_name
         """
         return db.session.execute(text(sql)).mappings().all()
 
+
+    def list_analysts_by_department(self):
+        """
+        Retorna analistas agrupables por departamento para el autocompletado
+        en creación de ticket (area -> primer analista).
+        """
+        sql = """
+        SELECT
+            u.id,
+            u.department_id,
+            CONCAT(u.names_worker, ' ', u.last_name) AS full_name
+        FROM users u
+        JOIN user_roles ur ON ur.user_id = u.id
+        JOIN roles r       ON r.id = ur.role_id
+        WHERE u.is_active = 1
+        AND u.department_id IS NOT NULL
+        AND UPPER(r.name) = 'ANALYST'
+        ORDER BY u.department_id, full_name
+        """
+        return db.session.execute(text(sql)).mappings().all()
+
+
+    # ==== CREACIÓN DE TICKET ====
     def next_ticket_code(self) -> str:
-        # obtiene el último y suma
         last = db.session.execute(text("SELECT MAX(id) AS mid FROM tickets")).scalar() or 0
         return f"INC-{(last + 1):05d}"
 
     def default_status_id(self) -> int:
-        # NUEVO como estado inicial
         return db.session.execute(text("SELECT id FROM statuses WHERE name='NUEVO'")).scalar()
 
     def insert_ticket(self, *, code, title, description, requester_id,
                       department_id, category_id, priority_id, assignee_id=None) -> CreatedTicket:
         status_id = self.default_status_id()
-        sql = text("""
+        res = db.session.execute(text("""
             INSERT INTO tickets
               (code, title, description, requester_id, assignee_id,
                department_id, category_id, priority_id, status_id)
             VALUES
               (:code, :title, :description, :requester_id, :assignee_id,
                :department_id, :category_id, :priority_id, :status_id)
-        """)
-        res = db.session.execute(sql, {
+        """), {
             "code": code,
             "title": title,
             "description": description,
@@ -104,13 +143,11 @@ class TicketRepository:
             "status_id": status_id
         })
         db.session.commit()
-        new_id = res.lastrowid
-        return CreatedTicket(id=new_id, code=code)
-    
-    # ==== DASHBOARD MÉTRICAS ====
+        return CreatedTicket(id=res.lastrowid, code=code)
 
+    # ==== DASHBOARD ====
     def kpis_for_user(self, user_id: int) -> dict:
-        sql = text("""
+        row = db.session.execute(text("""
         SELECT
           SUM(CASE WHEN s.name IN ('NUEVO','ASIGNADO','EN_PROGRESO') THEN 1 ELSE 0 END) AS open_count,
           SUM(CASE WHEN s.name = 'EN_PROGRESO' THEN 1 ELSE 0 END)                         AS in_progress_count,
@@ -118,30 +155,29 @@ class TicketRepository:
         FROM tickets t
         JOIN statuses s ON s.id = t.status_id
         WHERE (t.requester_id = :uid OR t.assignee_id = :uid)
-        """)
-        row = db.session.execute(sql, {"uid": user_id}).first()
+        """), {"uid": user_id}).first()
         return {
             "open":        int(row[0] or 0),
             "in_progress": int(row[1] or 0),
-            "closed_week": int(row[2] or 0),  # si quieres “últimos 7 días”, ajusta el WHERE con fecha
+            "closed_week": int(row[2] or 0),
         }
 
     def recent_for_user(self, user_id: int, limit: int = 5) -> list[RecentTicketRow]:
-        sql = text("""
+        rows = db.session.execute(text("""
         SELECT  
             t.id,
             t.code,
             t.title,
             CONCAT(rq.names_worker,' ',rq.last_name)   AS requester_name,
-            CONCAT(asg.names_worker,' ',asg.last_name) AS assignee_name,
+            CASE WHEN asg.id IS NULL THEN NULL ELSE CONCAT(asg.names_worker,' ',asg.last_name) END AS assignee_name,
             c.name                                     AS category_name,
             p.name                                     AS priority_name,
             s.name                                     AS status_name,
             DATE_FORMAT(t.updated_at, '%Y-%m-%d %H:%i') AS updated_at,
             CASE
-            WHEN t.requester_id = :uid THEN 'Solicitante'
-            WHEN t.assignee_id  = :uid THEN 'Asignado'
-            ELSE ''
+              WHEN t.requester_id = :uid THEN 'Solicitante'
+              WHEN t.assignee_id  = :uid THEN 'Asignado'
+              ELSE NULL
             END AS role_for_user
         FROM tickets t
         JOIN users rq        ON rq.id = t.requester_id
@@ -152,14 +188,12 @@ class TicketRepository:
         WHERE (t.requester_id = :uid OR t.assignee_id = :uid)
         ORDER BY t.updated_at DESC
         LIMIT :lim
-        """)
-        rows = db.session.execute(sql, {"uid": user_id, "lim": limit}).mappings().all()
+        """), {"uid": user_id, "lim": limit}).mappings().all()
         return [RecentTicketRow(**row) for row in rows]
 
-    
-    # ===== DETALLE =====
+    # ==== DETALLE ====
     def detail(self, ticket_id: int):
-        sql = text("""
+        row = db.session.execute(text("""
         SELECT t.id, t.code, t.title, t.description,
                t.requester_id,
                CONCAT(rq.names_worker, ' ', rq.last_name) AS requester_name,
@@ -177,12 +211,11 @@ class TicketRepository:
         JOIN priorities p ON p.id = t.priority_id
         JOIN statuses   s ON s.id = t.status_id
         WHERE t.id = :tid
-        """)
-        row = db.session.execute(sql, {"tid": ticket_id}).mappings().first()
+        """), {"tid": ticket_id}).mappings().first()
         return TicketDetail(**row) if row else None
 
     def comments(self, ticket_id: int):
-        sql = text("""
+        return db.session.execute(text("""
         SELECT tc.id, tc.body,
                DATE_FORMAT(tc.created_at,'%Y-%m-%d %H:%i') AS created_at,
                u.id AS author_id, CONCAT(u.names_worker,' ',u.last_name) AS author_name
@@ -190,21 +223,19 @@ class TicketRepository:
         JOIN users u ON u.id = tc.author_user_id
         WHERE tc.ticket_id = :tid
         ORDER BY tc.created_at ASC
-        """)
-        return db.session.execute(sql, {"tid": ticket_id}).mappings().all()
+        """), {"tid": ticket_id}).mappings().all()
 
     def attachments(self, ticket_id: int):
-        sql = text("""
+        return db.session.execute(text("""
         SELECT id, file_name, mime_type, file_size,
                DATE_FORMAT(created_at,'%Y-%m-%d %H:%i') AS created_at
         FROM ticket_attachments
         WHERE ticket_id = :tid
         ORDER BY created_at DESC
-        """)
-        return db.session.execute(sql, {"tid": ticket_id}).mappings().all()
+        """), {"tid": ticket_id}).mappings().all()
 
     def history(self, ticket_id: int):
-        sql = text("""
+        return db.session.execute(text("""
         SELECT th.id,
                DATE_FORMAT(th.created_at,'%Y-%m-%d %H:%i') AS created_at,
                CONCAT(u.names_worker,' ',u.last_name) AS actor,
@@ -217,8 +248,7 @@ class TicketRepository:
         JOIN statuses st ON st.id = th.to_status_id
         WHERE th.ticket_id = :tid
         ORDER BY th.created_at DESC
-        """)
-        return db.session.execute(sql, {"tid": ticket_id}).mappings().all()
+        """), {"tid": ticket_id}).mappings().all()
 
     def add_comment(self, ticket_id: int, author_user_id: int, body: str):
         db.session.execute(
@@ -233,11 +263,9 @@ class TicketRepository:
         if not safe_name:
             raise ValueError("Archivo inválido")
 
-        # ruta en disco
         disk_path = os.path.join(upload_dir, safe_name)
         file_storage.save(disk_path)
 
-        # metadatos
         size = os.path.getsize(disk_path)
         sha = hashlib.sha256()
         with open(disk_path, "rb") as fh:
@@ -262,131 +290,38 @@ class TicketRepository:
         return res.lastrowid
 
     def get_attachment_path(self, att_id: int, ticket_id: int):
-        row = db.session.execute(text("""
+        return db.session.execute(text("""
             SELECT file_path, file_name, mime_type
             FROM ticket_attachments
             WHERE id = :id AND ticket_id = :tid
         """), {"id": att_id, "tid": ticket_id}).mappings().first()
-        return row
-    
-# ===== NUEVOS MÉTODOS: catálogos para filtros =====
-    def get_statuses(self):
-        return db.session.execute(text("SELECT id, name FROM statuses ORDER BY name")).mappings().all()
 
-# ===== Listado de “Mis Tickets” con filtros y paginación =====
-    def list_mine(
-        self,
-        user_id: int,
-        *,
-        q: str | None = None,
-        status_id: int | None = None,
-        priority_id: int | None = None,
-        category_id: int | None = None,
-        date_from: str | None = None,   # 'YYYY-MM-DD'
-        date_to: str | None = None,     # 'YYYY-MM-DD'
-        page: int = 1,
-        per_page: int = 10
-    ) -> tuple[list[RecentTicketRow], int]:
-        """
-        Devuelve (items, total). Items con el mismo shape de recent_for_user.
-        Filtra por participación del usuario (requester o assignee).
-        """
-        where = ["(t.requester_id = :uid OR t.assignee_id = :uid)"]
-        params = {"uid": user_id}
-
-        if q:
-            # Busca por código exacto o por texto (FULLTEXT si aplica / fallback LIKE)
-            where.append("(t.code = :q_exact OR t.title LIKE :q_like)")
-            params["q_exact"] = q.strip()
-            params["q_like"] = f"%{q.strip()}%"
-
-        if status_id:
-            where.append("t.status_id = :status_id")
-            params["status_id"] = int(status_id)
-
-        if priority_id:
-            where.append("t.priority_id = :priority_id")
-            params["priority_id"] = int(priority_id)
-
-        if category_id:
-            where.append("t.category_id = :category_id")
-            params["category_id"] = int(category_id)
-
-        if date_from and date_to:
-            where.append("DATE(t.created_at) BETWEEN :dfrom AND :dto")
-            params["dfrom"] = date_from
-            params["dto"] = date_to
-        elif date_from:
-            where.append("DATE(t.created_at) >= :dfrom")
-            params["dfrom"] = date_from
-        elif date_to:
-            where.append("DATE(t.created_at) <= :dto")
-            params["dto"] = date_to
-
-        where_sql = " AND ".join(where)
-        limit = int(per_page or 10)
-        offset = max(int(page or 1), 1)
-        offset = (offset - 1) * limit
-
-        # total
-        sql_total = text(f"""
-            SELECT COUNT(*) FROM tickets t
-            WHERE {where_sql}
-        """)
-        total = db.session.execute(sql_total, params).scalar() or 0
-
-        # items
-        sql_items = text(f"""
-        SELECT  
-            t.id,
-            t.code,
-            t.title,
-            CONCAT(rq.names_worker,' ',rq.last_name)   AS requester_name,
-            CASE WHEN asg.id IS NULL THEN NULL ELSE CONCAT(asg.names_worker,' ',asg.last_name) END AS assignee_name,
-            c.name                                     AS category_name,
-            p.name                                     AS priority_name,
-            s.name                                     AS status_name,
-            DATE_FORMAT(t.updated_at, '%Y-%m-%d %H:%i') AS updated_at,
-            CASE
-              WHEN t.requester_id = :uid THEN 'Solicitante'
-              WHEN t.assignee_id  = :uid THEN 'Asignado'
-              ELSE ''
-            END AS role_for_user
-        FROM tickets t
-        JOIN users rq        ON rq.id = t.requester_id
-        LEFT JOIN users asg  ON asg.id = t.assignee_id
-        LEFT JOIN categories c ON c.id = t.category_id
-        JOIN priorities p    ON p.id = t.priority_id
-        JOIN statuses   s    ON s.id = t.status_id
-        WHERE {where_sql}
-        ORDER BY t.updated_at DESC
-        LIMIT :lim OFFSET :off
-        """)
-        rows = db.session.execute(sql_items, {**params, "lim": limit, "off": offset}).mappings().all()
-        items = [RecentTicketRow(**row) for row in rows]
-        return items, int(total)
-    
-# ===== para permisos / estado actual =====
+    # ====== AUX: datos mínimos / permisos ======
     def get_ticket_minimal(self, ticket_id: int):
-        row = db.session.execute(text("""
+        return db.session.execute(text("""
             SELECT id, assignee_id, status_id
             FROM tickets
             WHERE id = :tid
         """), {"tid": ticket_id}).mappings().first()
-        return row  # dict-like: {"id":..,"assignee_id":..,"status_id":..}
 
+    def get_user_fullname(self, user_id: int | None) -> str | None:
+        if not user_id:
+            return None
+        row = db.session.execute(text("""
+            SELECT CONCAT(u.names_worker,' ',u.last_name) AS full_name
+            FROM users u WHERE u.id = :uid
+        """), {"uid": user_id}).first()
+        return row[0] if row else None
 
-# ===== Actualizar estado + historial =====
-    def update_status_with_history(
-        self,
-        *,
-        ticket_id: int,
-        to_status_id: int,
-        actor_user_id: int,
-        note: str | None = None
-    ):
+    def get_user_department_id(self, user_id: int) -> int | None:
+        row = db.session.execute(text("""
+            SELECT department_id FROM users WHERE id = :uid
+        """), {"uid": user_id}).first()
+        return row[0] if row else None
+
+    # ====== HISTORIAL: cambio de estado / asignación ======
+    def update_status_with_history(self, *, ticket_id: int, to_status_id: int, actor_user_id: int, note: str | None = None):
         try:
-            # 1) Lock de la fila (InnoDB) para leer el estado actual
             cur = db.session.execute(text("""
                 SELECT status_id
                 FROM tickets
@@ -398,7 +333,6 @@ class TicketRepository:
 
             from_status_id = int(cur[0])
 
-            # 2) Actualizar estado
             db.session.execute(text("""
                 UPDATE tickets
                 SET status_id = :to_status_id,
@@ -406,7 +340,6 @@ class TicketRepository:
                 WHERE id = :tid
             """), {"to_status_id": int(to_status_id), "tid": ticket_id})
 
-            # 3) Insertar historial
             db.session.execute(text("""
                 INSERT INTO ticket_history
                     (ticket_id, actor_user_id, from_status_id, to_status_id, note, created_at)
@@ -420,38 +353,13 @@ class TicketRepository:
                 "note": (note or "").strip() or None
             })
 
-            # 4) Commit al final (sin begin explícito)
             db.session.commit()
-
         except Exception:
             db.session.rollback()
             raise
 
-    # ASIGNAR       
-
-    def get_user_fullname(self, user_id: int | None) -> str | None:
-        if not user_id:
-            return None
-        row = db.session.execute(text("""
-            SELECT CONCAT(u.names_worker,' ',u.last_name) AS full_name
-            FROM users u WHERE u.id = :uid
-        """), {"uid": user_id}).first()
-        return row[0] if row else None
-
-    def update_assignee_with_history(
-        self,
-        *,
-        ticket_id: int,
-        new_assignee_id: int | None,
-        actor_user_id: int,
-        note: str | None = None
-    ):
-        """
-        Cambia el asignado y registra un evento en ticket_history.
-        Mantiene from_status_id = to_status_id (no cambiamos estado).
-        """
+    def update_assignee_with_history(self, *, ticket_id: int, new_assignee_id: int | None, actor_user_id: int, note: str | None = None):
         try:
-            # Lock de la fila: obtenemos status y asignado actual
             cur = db.session.execute(text("""
                 SELECT status_id, assignee_id
                 FROM tickets
@@ -464,17 +372,14 @@ class TicketRepository:
             current_status_id = int(cur[0])
             old_assignee_id = cur[1]
 
-            # Nombres para la nota
             old_name = self.get_user_fullname(old_assignee_id) or "—"
             new_name = self.get_user_fullname(new_assignee_id) or "—"
 
-            note_parts = []
-            note_parts.append(f"Reasignado de {old_name} a {new_name}")
+            note_parts = [f"Reasignado de {old_name} a {new_name}"]
             if (note or "").strip():
-                note_parts.append((note or "").strip())
+                note_parts.append(note.strip())
             final_note = " — ".join(note_parts)
 
-            # Update asignado
             db.session.execute(text("""
                 UPDATE tickets
                 SET assignee_id = :new_assignee,
@@ -482,7 +387,6 @@ class TicketRepository:
                 WHERE id = :tid
             """), {"new_assignee": new_assignee_id, "tid": ticket_id})
 
-            # Historial (misma transición de estado, solo nota)
             db.session.execute(text("""
                 INSERT INTO ticket_history
                     (ticket_id, actor_user_id, from_status_id, to_status_id, note, created_at)
@@ -501,23 +405,13 @@ class TicketRepository:
             db.session.rollback()
             raise
 
-    def get_user_department_id(self, user_id: int) -> int | None:
-            row = db.session.execute(text("""
-                SELECT department_id FROM users WHERE id = :uid
-            """), {"uid": user_id}).first()
-            return row[0] if row else None
-
+    # ====== LISTAS / ASIGNABLES ======
     def list_assignable_requesters_same_dept(self, actor_user_id: int):
-        """
-        Devuelve usuarios REQUESTER del mismo departamento del actor.
-        """
         dept = self.get_user_department_id(actor_user_id)
         if dept is None:
             return []
-
-        rows = db.session.execute(text("""
-            SELECT u.id,
-                   CONCAT(u.names_worker,' ',u.last_name) AS full_name
+        return db.session.execute(text("""
+            SELECT u.id, CONCAT(u.names_worker,' ',u.last_name) AS full_name
             FROM users u
             JOIN user_roles ur ON ur.user_id = u.id
             JOIN roles r       ON r.id = ur.role_id
@@ -525,12 +419,8 @@ class TicketRepository:
               AND UPPER(r.name) = 'REQUESTER'
             ORDER BY full_name
         """), {"dept": dept}).mappings().all()
-        return rows  # [{id, full_name}, ...]
 
     def is_requester_same_dept(self, actor_user_id: int, target_user_id: int) -> bool:
-        """
-        ¿El target tiene rol REQUESTER y pertenece al mismo depto que el actor?
-        """
         rows = db.session.execute(text("""
             SELECT 1
             FROM users ta
@@ -542,3 +432,123 @@ class TicketRepository:
             LIMIT 1
         """), {"actor": actor_user_id, "target": target_user_id}).all()
         return bool(rows)
+
+    def list_all_users_minimal(self):
+        return db.session.execute(text("""
+            SELECT u.id, CONCAT(u.names_worker,' ',u.last_name) AS full_name
+            FROM users u
+            ORDER BY full_name
+        """)).mappings().all()
+
+    def list_assignables_for_actor(self, actor_user_id: int, roles_upper: set[str]):
+        if "ADMIN" in roles_upper:
+            return self.list_all_users_minimal()
+        return self.list_assignable_requesters_same_dept(actor_user_id)
+
+    # ====== LISTADOS (para /app/mine con reglas por rol) ======
+
+    def _apply_common_filters(self, where: list[str], params: dict,
+                              q=None, status_id=None, priority_id=None, category_id=None,
+                              date_from=None, date_to=None):
+        if q:
+            where.append("(t.code = :q_exact OR t.title LIKE :q_like)")
+            params["q_exact"] = q.strip()
+            params["q_like"] = f"%{q.strip()}%"
+        if status_id:
+            where.append("t.status_id = :status_id")
+            params["status_id"] = int(status_id)
+        if priority_id:
+            where.append("t.priority_id = :priority_id")
+            params["priority_id"] = int(priority_id)
+        if category_id:
+            where.append("t.category_id = :category_id")
+            params["category_id"] = int(category_id)
+        if date_from and date_to:
+            where.append("DATE(t.created_at) BETWEEN :dfrom AND :dto")
+            params["dfrom"] = date_from
+            params["dto"] = date_to
+        elif date_from:
+            where.append("DATE(t.created_at) >= :dfrom")
+            params["dfrom"] = date_from
+        elif date_to:
+            where.append("DATE(t.created_at) <= :dto")
+            params["dto"] = date_to
+
+    def _paged_items(self, where_sql: str, params: dict, page: int, per_page: int, include_role_for: int | None = None):
+        limit = int(per_page or 10)
+        offset = max(int(page or 1), 1)
+        offset = (offset - 1) * limit
+
+        total = db.session.execute(text(f"""
+            SELECT COUNT(*)
+            FROM tickets t
+            WHERE {where_sql}
+        """), params).scalar() or 0
+
+        # NOTA: role_for_user solo si lo necesitamos (cuando filtramos por el propio usuario)
+        role_for_case = ""
+        if include_role_for is not None:
+            role_for_case = """
+                , CASE
+                    WHEN t.requester_id = :rfu THEN 'Solicitante'
+                    WHEN t.assignee_id  = :rfu THEN 'Asignado'
+                    ELSE NULL
+                  END AS role_for_user
+            """
+
+        items = db.session.execute(text(f"""
+            SELECT
+              t.id,
+              t.code,
+              t.title,
+              CONCAT(rq.names_worker,' ',rq.last_name) AS requester_name,
+              CASE WHEN asg.id IS NULL THEN NULL ELSE CONCAT(asg.names_worker,' ',asg.last_name) END AS assignee_name,
+              c.name AS category_name,
+              p.name AS priority_name,
+              s.name AS status_name,
+              DATE_FORMAT(t.updated_at, '%Y-%m-%d %H:%i') AS updated_at
+              {role_for_case}
+            FROM tickets t
+            JOIN users rq        ON rq.id = t.requester_id
+            LEFT JOIN users asg  ON asg.id = t.assignee_id
+            LEFT JOIN categories c ON c.id = t.category_id
+            JOIN priorities p    ON p.id = t.priority_id
+            JOIN statuses   s    ON s.id = t.status_id
+            WHERE {where_sql}
+            ORDER BY t.updated_at DESC
+            LIMIT :lim OFFSET :off
+        """), {**params, "lim": limit, "off": offset, **({"rfu": include_role_for} if include_role_for is not None else {})}).mappings().all()
+
+        out = []
+        for row in items:
+            d = dict(row)
+            # asegura presencia de role_for_user (aunque no lo use el template)
+            if "role_for_user" not in d:
+                d["role_for_user"] = None
+            out.append(d)
+        return out, int(total)
+
+    # --- REQUESTER: asignados o creados por él (también sirve para “Mis Tickets” legacy) ---
+    def list_mine(self, user_id: int, *, q=None, status_id=None, priority_id=None, category_id=None,
+                  date_from=None, date_to=None, page=1, per_page=10):
+        where = ["(t.requester_id = :uid OR t.assignee_id = :uid)"]
+        params = {"uid": user_id}
+        self._apply_common_filters(where, params, q, status_id, priority_id, category_id, date_from, date_to)
+        return self._paged_items(" AND ".join(where), params, page, per_page, include_role_for=user_id)
+
+    # --- ADMIN: todos ---
+    def list_all(self, *, q=None, status_id=None, priority_id=None, category_id=None,
+                 date_from=None, date_to=None, page=1, per_page=10):
+        where = ["1=1"]
+        params = {}
+        self._apply_common_filters(where, params, q, status_id, priority_id, category_id, date_from, date_to)
+        return self._paged_items(" AND ".join(where), params, page, per_page, include_role_for=None)
+
+    # --- ANALYST: por departamento o creados por él ---
+    def list_by_department_or_creator(self, department_id: int, user_id: int, *,
+                                      q=None, status_id=None, priority_id=None, category_id=None,
+                                      date_from=None, date_to=None, page=1, per_page=10):
+        where = ["(t.department_id = :dep OR t.requester_id = :uid)"]
+        params = {"dep": int(department_id), "uid": int(user_id)}
+        self._apply_common_filters(where, params, q, status_id, priority_id, category_id, date_from, date_to)
+        return self._paged_items(" AND ".join(where), params, page, per_page, include_role_for=user_id)

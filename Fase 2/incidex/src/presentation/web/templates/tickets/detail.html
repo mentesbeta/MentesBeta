@@ -70,17 +70,26 @@
             <input type="hidden" id="hidden_note" name="note">
 
             <div class="form__group">
-              <label for="to_status_id_select"></label>
               <select id="to_status_id_select" class="input" required
                       data-prev="{{ current_status_id or '' }}">
                 <option value="">Selecciona…</option>
+                {# opciones permitidas como ya las tienes #}
                 {% for s in statuses %}
-                  <option value="{{ s.id }}" {{ 'selected' if current_status_id==s.id else '' }}>
-                    {{ s.name }}
-                  </option>
+                  {% set nm = s.name.upper() %}
+                  {% if
+                      is_admin
+                      or (is_analyst and nm in ['EN_PROGRESO','ASIGNADO','RECHAZADO','CERRADO'])
+                      or (is_request and is_assignee and nm in ['EN_PROGRESO','RESUELTO'])
+                      or (is_assignee and nm == 'EN_PROGRESO')
+                  %}
+                    <option value="{{ s.id }}" {{ 'selected' if current_status_id==s.id else '' }}>
+                      {{ s.name }}
+                    </option>
+                  {% endif %}
                 {% endfor %}
               </select>
             </div>
+
             {# Sin botón; el modal se abre al cambiar el select #}
           </form>
         </section>
@@ -94,7 +103,6 @@
             <input type="hidden" id="hidden_assign_note" name="note">
 
             <div class="form__group">
-              <label for="assignee_id_select">Seleccionar persona</label>
               <select id="assignee_id_select" class="input" required
                       data-prev="{{ current_assignee_id or '' }}">
                 <option value="">— Selecciona —</option>
