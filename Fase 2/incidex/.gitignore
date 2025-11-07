@@ -1,37 +1,29 @@
-# Entornos virtuales
-.venv/
-venv/
-
-# Configuración de entorno
-.env
-.env.*
-
-# Archivos temporales
+﻿# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Virtualenvs
+.venv*/
+venv*/
+
+# Entornos
+.env
+.env.*
+
+# Logs y temporales
 *.log
-
-# Datos y backups
-backups/
-*.sql
-
-# Docker
 *.pid
 *.sock
-mysql_data/
-**/node_modules/
 
-# Archivos de IDEs
-.vscode/
-.idea/
+# Node
+node_modules/
+
+# OS
 .DS_Store
 Thumbs.db
 
-# Ignorar backups o dumps accidentales
-/*.sql
-/backups/
-
-# Pero incluir las migraciones del proyecto
-!db/migrations/*.sql
+# Docker y datos
+mysql_data/
+var/uploads/

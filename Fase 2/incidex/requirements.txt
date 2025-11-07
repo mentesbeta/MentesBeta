@@ -1,14 +1,18 @@
 Flask==2.3.2
-Flask-Login>=0.6
-Werkzeug>=3
-python-dotenv==1.0.0
-bcrypt==4.0.1
+Flask-Login==0.6.3
+Flask-WTF==1.2.1
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.7
+python-dotenv==1.0.1
+Werkzeug==3.0.3
 
 SQLAlchemy==2.0.21
 PyMySQL==1.1.0
-
-Flask-Migrate
-Flask-WTF
-pymysql
-
+cryptography==42.0.8
+PySide6==6.10.0
+pymysql==1.1.0
 cryptography>=42
+python-dotenv==1.0.0
+pip install pymysql python-dotenv
+
+
