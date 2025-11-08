@@ -5,6 +5,9 @@ import bcrypt
 from core.database import get_connection
 from datetime import datetime
 import bcrypt
+import imaplib
+import email
+from email.header import decode_header
 
 class DBManager:
     # -----------------------------------------------------------
@@ -645,3 +648,63 @@ class DBManager:
             return False
         
         
+    @staticmethod
+    def obtener_correos_usuario(usuario, contrasena, servidor="imap.gmail.com", cantidad=10):
+        """
+        Retorna los últimos 'cantidad' correos del usuario Gmail.
+        Devuelve lista de dicts: [{id, asunto, remitente, fecha, contenido}]
+        """
+        correos = []
+        try:
+            mail = imaplib.IMAP4_SSL(servidor)
+            mail.login(usuario, contrasena)
+            mail.select("INBOX")
+
+            status, data = mail.search(None, "ALL")
+            ids = data[0].split()[-cantidad:]
+
+            for num in reversed(ids):
+                status, msg_data = mail.fetch(num, "(RFC822)")
+                if status != "OK":
+                    continue
+
+                msg = email.message_from_bytes(msg_data[0][1])
+
+                def safe_decode(text):
+                    if not text:
+                        return ""
+                    val, enc = decode_header(text)[0]
+                    if isinstance(val, bytes):
+                        try:
+                            return val.decode(enc or "utf-8", errors="ignore")
+                        except Exception:
+                            return val.decode("utf-8", errors="ignore")
+                    return val
+
+                subject = safe_decode(msg.get("Subject"))
+                from_ = safe_decode(msg.get("From"))
+                date_ = safe_decode(msg.get("Date"))
+
+                # Buscar el cuerpo de texto plano
+                contenido = ""
+                if msg.is_multipart():
+                    for part in msg.walk():
+                        if part.get_content_type() == "text/plain":
+                            contenido = part.get_payload(decode=True).decode("utf-8", errors="ignore")
+                            break
+                else:
+                    contenido = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
+
+                correos.append({
+                    "id": num.decode() if isinstance(num, bytes) else str(num),
+                    "asunto": subject,
+                    "remitente": from_,
+                    "fecha": date_,
+                    "contenido": contenido.strip()
+                })
+
+            mail.logout()
+        except Exception as e:
+            print("❌ Error al obtener correos:", e)
+
+        return correos   

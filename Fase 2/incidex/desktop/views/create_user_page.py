@@ -1,17 +1,22 @@
 # -*- coding: utf-8 -*-
 """
-CreateUserPage — Formulario que captura variables y carga roles y departamentos desde DB.
-- Carga roles desde `roles` y departamentos desde `departments`.
-- Captura todos los valores y ejecuta la creación del usuario al presionar "Crear Cuenta".
+CreateUserPage — Formulario que captura variables, valida datos
+y envía correo automático con credenciales al crear usuario.
 """
 
 from PySide6.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QLineEdit,
-    QComboBox, QPushButton, QDateEdit, QFrame, QSizePolicy, QMessageBox
+    QComboBox, QPushButton, QDateEdit, QFrame, QMessageBox
 )
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QPixmap
 from core.resources import asset_path
+
+import re
+from datetime import date, datetime
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 try:
     from core.db_manager import DBManager
@@ -44,9 +49,9 @@ class CreateUserPage(QWidget):
                 color: #000;
                 font-size: 12px;
                 font-weight: 600;
-                padding-left: 4px;         /* 🔹 desplaza ligeramente el texto a la izquierda */
-                margin-bottom: 2px;        /* 🔹 mantiene la separación ordenada */
-                alignment: left;           /* 🔹 fuerza alineación visual con los campos */
+                padding-left: 4px;
+                margin-bottom: 2px;
+                alignment: left;
             }
 
             QLineEdit, QComboBox, QDateEdit {
@@ -59,31 +64,6 @@ class CreateUserPage(QWidget):
                 min-height: 24px;
                 height: 24px;
                 font-weight: normal;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #ffffff;
-                color: #000000;
-                selection-background-color: #e0e0e0;
-                selection-color: #000000;
-            }
-
-            QCalendarWidget QToolButton {
-                color: #000000;
-                background-color: #ffffff;
-                font-weight: normal;
-            }
-
-            QCalendarWidget QWidget {
-                color: #000000;
-                background-color: #ffffff;
-                font-weight: normal;
-            }
-
-            QCalendarWidget QAbstractItemView:enabled {
-                color: #000000;
-                selection-background-color: #1E73FA;
-                selection-color: #ffffff;
             }
 
             QPushButton {
@@ -104,7 +84,6 @@ class CreateUserPage(QWidget):
         form_layout.setContentsMargins(8, 6, 8, 6)
         form_layout.setSpacing(6)
 
-        # Helper
         def add_field(label_text: str, widget: QWidget):
             lbl = QLabel(label_text)
             form_layout.addWidget(lbl)
@@ -144,12 +123,12 @@ class CreateUserPage(QWidget):
         self.email.setPlaceholderText("Correo")
         add_field("Correo:", self.email)
 
-        # === Género === (sin "Selecciona")
+        # === Género ===
         self.gender = QComboBox()
         self.gender.addItems(["Masculino", "Femenino", "Otro"])
         add_field("Género:", self.gender)
 
-        # === Departamento (nuevo) ===
+        # === Departamento ===
         self.department = QComboBox()
         self.department.addItem("Cargando departamentos...")
         add_field("Departamento:", self.department)
@@ -200,18 +179,15 @@ class CreateUserPage(QWidget):
             self.role.clear()
             self.role.addItem("No hay conexión a DB")
             return
-
         try:
             roles = DBManager.obtener_roles() or []
         except Exception as e:
             print("❌ Error al obtener roles:", e)
             roles = []
-
         self.role.clear()
         if not roles:
             self.role.addItem("No hay roles disponibles")
             return
-
         for r in roles:
             rid, rname = (r[0], r[1]) if isinstance(r, (list, tuple)) else (r["id"], r["name"])
             self.role.addItem(str(rname), rid)
@@ -221,18 +197,15 @@ class CreateUserPage(QWidget):
             self.department.clear()
             self.department.addItem("No hay conexión a DB")
             return
-
         try:
             deps = DBManager.obtener_departamentos() or []
         except Exception as e:
             print("❌ Error al obtener departamentos:", e)
             deps = []
-
         self.department.clear()
         if not deps:
             self.department.addItem("No hay departamentos disponibles")
             return
-
         for d in deps:
             did, dname = (d[0], d[1]) if isinstance(d, (list, tuple)) else (d["id"], d["name"])
             self.department.addItem(str(dname), did)
@@ -241,10 +214,8 @@ class CreateUserPage(QWidget):
     def get_form_values(self) -> dict:
         fecha = self.birth.date()
         fecha_str = f"{fecha.year():04d}-{fecha.month():02d}-{fecha.day():02d}"
-
         genero_text = self.gender.currentText()
         genero_db = {"Masculino": "M", "Femenino": "F", "Otro": "X"}.get(genero_text, None)
-
         return {
             "nombre": self.name_edit.text().strip(),
             "apellido": self.last_edit.text().strip(),
@@ -263,7 +234,7 @@ class CreateUserPage(QWidget):
     def on_crear_clicked(self):
         data = self.get_form_values()
 
-        # Validaciones básicas
+        # === Validaciones básicas ===
         if not data["nombre"] or not data["apellido"] or not data["correo"]:
             QMessageBox.warning(self, "Campos requeridos", "Completa nombre, apellido y correo.")
             return
@@ -277,19 +248,68 @@ class CreateUserPage(QWidget):
             QMessageBox.warning(self, "Error", "Selecciona un rol y un departamento válidos.")
             return
 
+        # === Validar edad ===
+        try:
+            fecha_nac = datetime.strptime(data["fecha_nacimiento"], "%Y-%m-%d").date()
+            hoy = date.today()
+            edad = hoy.year - fecha_nac.year - ((hoy.month, hoy.day) < (fecha_nac.month, fecha_nac.day))
+            if edad < 18 or edad > 100:
+                QMessageBox.warning(
+                    self, "Edad no válida",
+                    "La edad debe ser mayor o igual a 18 años y menor o igual a 100 años."
+                )
+                return
+        except Exception:
+            QMessageBox.warning(self, "Fecha", "La fecha de nacimiento no es válida.")
+            return
+
+        # === Validar correo ===
+        patron_correo = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+        if not re.match(patron_correo, data["correo"]):
+            QMessageBox.warning(self, "Correo inválido", "El correo ingresado no tiene un formato válido.")
+            return
+
+        # === Validar contraseña ===
+        patron_password = (
+            r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)'
+            r'(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$'
+        )
+        if not re.match(patron_password, data["password"]):
+            QMessageBox.warning(
+                self, "Contraseña insegura",
+                "La contraseña debe tener al menos:\n"
+                "- Una mayúscula\n"
+                "- Una minúscula\n"
+                "- Un número\n"
+                "- Un símbolo especial (!@#$...)\n"
+                "- 8 caracteres o más"
+            )
+            return
+
+        # === Crear usuario ===
         ok = DBManager.crear_usuario(
             nombre=data["nombre"],
             apellido=data["apellido"],
             nacimiento=data["fecha_nacimiento"],
             correo=data["correo"],
             genero=data["genero"],
-            password_hash=data["password"],
+            password=data["password"],
             rol_id=data["rol_id"],
             departamento_id=data["dept_id"]
         )
 
         if ok:
             QMessageBox.information(self, "Éxito", "Usuario creado correctamente.")
+
+            # Enviar correo con credenciales
+            self.enviar_correo_credenciales(
+                correo_destino=data["correo"],
+                nombre=data["nombre"],
+                correo_usuario=data["correo"],
+                contraseña=data["password"]
+            )
+
+            # Registrar en bitácora
             usuario_log = DBManager.get_user()
             if usuario_log:
                 DBManager.insertar_bitacora(
@@ -309,7 +329,7 @@ class CreateUserPage(QWidget):
             self.role.setCurrentIndex(0)
             self.department.setCurrentIndex(0)
 
-            # Refrescar la lista de usuarios si existe la vista
+            # Refrescar vista
             parent_window = self.parentWidget()
             while parent_window and not hasattr(parent_window, "stack"):
                 parent_window = parent_window.parentWidget()
@@ -318,4 +338,44 @@ class CreateUserPage(QWidget):
                 parent_window.admin_user_page.refrescar_datos()
                 parent_window.stack.setCurrentWidget(parent_window.admin_user_page)
 
-                
+    # ------------------------------------------------------------------
+    def enviar_correo_credenciales(self, correo_destino, nombre, correo_usuario, contraseña):
+        """Envía un correo con las credenciales de acceso al nuevo usuario."""
+        remitente = "pororeal1@gmail.com"
+        app_password = "tdpfjqeyfpnbovxv"
+        asunto = "Cuenta creada - Plataforma Incidex"
+
+        mensaje_html = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; color: #333;">
+                <h2 style="color:#1E73FA;">¡Hola {nombre}!</h2>
+                <p>Tu cuenta en <b>Incidex</b> ha sido creada exitosamente.</p>
+                <p>A continuación tus credenciales de acceso:</p>
+                <table style="border-collapse: collapse;">
+                    <tr><td><b>Usuario:</b></td><td>{correo_usuario}</td></tr>
+                    <tr><td><b>Contraseña:</b></td><td>{contraseña}</td></tr>
+                </table>
+                <hr>
+                <p style="font-size: 12px; color: #777;">Este es un mensaje automático, por favor no responder.</p>
+            </body>
+        </html>
+        """
+
+        try:
+            msg = MIMEMultipart()
+            msg["From"] = remitente
+            msg["To"] = correo_destino
+            msg["Subject"] = asunto
+            msg.attach(MIMEText(mensaje_html, "html"))
+
+            with smtplib.SMTP("smtp.gmail.com", 587) as server:
+                server.starttls()
+                server.login(remitente, app_password)
+                server.send_message(msg)
+
+            print(f"✅ Correo enviado exitosamente a {correo_destino}")
+            return True
+
+        except Exception as e:
+            print(f"❌ Error al enviar correo a {correo_destino}: {e}")
+            return False

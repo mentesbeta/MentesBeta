@@ -30,6 +30,8 @@ from views.generar_reporte_page import GenerarReportePage
 from views.modificar_categoria_page import ModificarCategoriaPage
 from views.modificar_departamento_page import ModificarDepartamentoPage
 from views.generar_reporte_page import GenerarReportePage
+from views.listar_correos_page import ListarCorreosPage
+
 
 from PySide6.QtGui import QStandardItem
 
@@ -100,7 +102,7 @@ class MainWindow(QMainWindow):
         self.report_page.generarReporte.connect(self.on_generar_reporte)
         self.report_page.conectar_tickets(self.on_generar_reporte)
         self.report_page.conectar_acciones(self.on_generar_bitacora)
-
+        self.listar_correos_page = ListarCorreosPage()
         self.bitacora_page = BitacoraPage()
 
         # === Añadir páginas al stack ===
@@ -116,6 +118,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.bitacora_page)
         self.stack.addWidget(self.modificar_categoria_page)
         self.stack.addWidget(self.modificar_departamento_page)
+        self.stack.addWidget(self.listar_correos_page)
 
         self.stack.setCurrentWidget(self.home_page)
 
@@ -249,6 +252,9 @@ class MainWindow(QMainWindow):
         root.addWidget(make_menu_button("Administrar Departamentos", "Manage Departments", lambda: self.stack.setCurrentWidget(self.admin_departamentos_page)))
         root.addWidget(make_menu_button("Generar Reporte", "Generate Report", lambda: self.stack.setCurrentWidget(self.report_page)))
         root.addWidget(make_menu_button("Bitácora de Acciones", "Action Log", lambda: self.stack.setCurrentWidget(self.bitacora_page)))
+        root.addWidget(make_menu_button("Correos", "Inbox", self._abrir_correos))
+
+
 
         root.addStretch(1)
 
@@ -458,4 +464,8 @@ class MainWindow(QMainWindow):
             print("❌ Error al generar reporte de bitácora:", e)
   
 
-  
+    def _abrir_correos(self):
+        """Abre la vista de correos y carga los mensajes solo si aún no se cargaron."""
+        self.stack.setCurrentWidget(self.listar_correos_page)
+        if not self.listar_correos_page._correos_cargados:
+            self.listar_correos_page.cargar_correos()

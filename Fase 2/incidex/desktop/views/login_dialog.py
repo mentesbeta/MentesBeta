@@ -111,19 +111,7 @@ class Ui_Dialog(object):
             QPushButton:hover { background-color: #333; }
         """)
 
-        # Enlace olvido
-        self.btn_forgot = QPushButton("¿Has olvidado tu contraseña?", self.frame)
-        self.btn_forgot.setGeometry(QRect(160, 280, 171, 21))
-        self.btn_forgot.setFlat(True)
-        self.btn_forgot.setStyleSheet("""
-            QPushButton {
-                color: blue;
-                font-size: 11px;
-                text-decoration: underline;
-                background: transparent;
-                border: none;
-            }
-        """)
+
 
         # === Logo ===
         self.label_logo = QLabel(self.widget)
@@ -176,8 +164,6 @@ class LoginDialog(QDialog):
     def _connect_signals(self):
         self.ui.btn_salir.clicked.connect(self.close)
         self.ui.btn_login.clicked.connect(self._on_login)
-        self.ui.btn_forgot.clicked.connect(self._on_forgot)
-        self.ui.line_pass.returnPressed.connect(self._on_login)
 
     # === Acción de Login ===
     def _on_login(self):
