@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from src.infrastructure.ai.gemini_client import suggest_ticket_metadata
 
 ADMIN_ROLES = {"ADMIN", "ANALYST"}
 
@@ -23,6 +24,14 @@ class TicketBundle:
     history: list
     can_act: bool
 
+@dataclass
+class AISuggestion:
+    category_id: int | None
+    priority_id: int | None
+    department_id: int | None
+    reason: str | None = None
+
+
 class TicketService:
     def __init__(self, repo):
         self.repo = repo
@@ -34,6 +43,39 @@ class TicketService:
             priorities = self.repo.get_priorities(),
             analysts = self.repo.get_analysts()
         )
+    
+    def ai_suggest_metadata(self, title: str, details: str) -> AISuggestion | None:
+        """
+        Pide a Gemini que sugiera categoría, prioridad y departamento.
+        """
+        cats = self.repo.get_categories()
+        deps = self.repo.get_departments()
+        pris = self.repo.get_priorities()
+
+        raw = suggest_ticket_metadata(
+            title=title,
+            description=details,
+            categories=cats,
+            priorities=pris,
+            departments=deps,
+        )
+        if not raw:
+            return None
+
+        def safe_int(key):
+            try:
+                v = raw.get(key)
+                return int(v) if v is not None else None
+            except Exception:
+                return None
+
+        return AISuggestion(
+            category_id=safe_int("category_id"),
+            priority_id=safe_int("priority_id"),
+            department_id=safe_int("department_id"),
+            reason=raw.get("reason"),
+        )
+
 
     # ======= Crear ticket =======
     def create(self, *, requester_id: int, subject: str, details: str,

@@ -60,13 +60,18 @@
       <div>
         <label for="to">Hasta</label><br>
         <input id="to" name="to" class="input" type="date" value="{{ filters.to or '' }}">
+        
+        <button class="btn btn-primary" type="submit">Aplicar</button>
       </div>
 
-      <div>
-        <label>&nbsp;</label><br>
-        <button class="btn btn-primary" type="submit">Aplicar</button>
-        <a class="btn btn-outline" href="{{ url_for('tickets.mine') }}">Limpiar</a>
+      <div class="specific-btns">
+          <a class="btn btn-outline" href="{{ url_for('tickets.mine') }}">Limpiar</a>
+          <button class="btn btn-outline" type="submit"
+                  formaction="{{ url_for('tickets.mine_export') }}">
+            Exportar
+          </button>
       </div>
+
     </form>
 
     <!-- Tabla -->

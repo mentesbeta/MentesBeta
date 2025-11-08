@@ -72,3 +72,69 @@ select:disabled {
   color: #9ca3af;        /* placeholder más tenue */
 }
 
+.attachments-head{
+  display:flex;
+  align-items:center;
+  gap:.8rem;
+  margin-top:.25rem;
+  margin-bottom:.25rem;
+}
+
+.attachments-label{
+  font-weight:700;
+  color:#0d2847;
+}
+
+/* Chips de archivos a adjuntar */
+  .file-list { list-style:none; padding:0; margin:.35rem 0 0; display:flex; flex-wrap:wrap; gap:8px; }
+  .file-chip { display:inline-flex; align-items:center; gap:6px; padding:.35rem .55rem; border-radius:999px;
+               background:#eef4ff; border:1px solid #cfe0ff; color:#0b2f69; font-size:.9rem; }
+  .file-chip .remove { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px;
+                       border-radius:50%; background:#0b2f69; color:#fff; font-weight:700; line-height:1;
+                       cursor:pointer; border:0; }
+  .file-chip .remove:hover { filter:brightness(1.1); }
+
+  /* Select deshabilitado (solo visual) */
+  .input.-readonly { background:#f7f7f9; color:#6b7280; pointer-events:none; }
+
+  .ai-spinner{
+    display:flex;
+    align-items:center;
+    gap:.5rem;
+    font-size:.9rem;
+    color:#1e63d1;
+    margin-bottom:.5rem;
+  }
+
+  /* 👇 fuerza que, si está hidden, NO se vea */
+  .ai-spinner[hidden]{
+    display:none !important;
+  }
+
+  @keyframes ai-spin{
+    to { transform: rotate(360deg); }
+  }
+
+  .ticket-wizard.is-busy{
+  position:relative;
+}
+
+/* capa semitransparente arriba del wizard */
+.ticket-wizard.is-busy::after{
+  content:"Analizando con IA…";
+  position:absolute;
+  inset:0;
+  background:rgba(255,255,255,.65);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:600;
+  color:#1e63d1;
+  z-index:20;
+}
+
+/* evita clicks en el contenido mientras está ocupado */
+.ticket-wizard.is-busy *{
+  pointer-events:none;
+}
+

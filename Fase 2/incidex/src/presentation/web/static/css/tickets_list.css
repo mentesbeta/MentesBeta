@@ -24,3 +24,20 @@
 .pager .muted{ color:#5d6b7c; }
 
 .stack section.card h3 { margin-top: 0; }
+.specific-btns button.btn.btn-outline {
+    -webkit-appearance: none; 
+    -moz-appearance: none;    
+    appearance: none;         
+    background: transparent;
+    color: #0d47a1; 
+}
+.specific-btns .btn {
+    width: 120px; 
+    box-sizing: border-box; 
+    text-align: center;
+    line-height: normal;
+}
+.specific-btns {
+    display: flex;
+    gap: 10px; 
+}

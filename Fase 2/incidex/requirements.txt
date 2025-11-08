@@ -13,6 +13,8 @@ PySide6==6.10.0
 pymysql==1.1.0
 cryptography>=42
 python-dotenv==1.0.0
-pip install pymysql python-dotenv
+
+google-generativeai
+
 
 

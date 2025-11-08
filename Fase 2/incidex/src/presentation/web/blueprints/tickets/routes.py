@@ -5,6 +5,9 @@ from src.presentation.web.blueprints.tickets.forms import TicketCreateForm
 from src.application.use_cases.ticket_service import TicketService
 from src.infrastructure.persistence.repositories.ticket_repository import TicketRepository
 
+import io
+import csv
+
 tickets = Blueprint('tickets', __name__, url_prefix='/app')
 
 
@@ -65,14 +68,22 @@ def create_post():
     priority_id    = request.form.get('priority_id', type=int)
     assignee_id    = request.form.get('assignee_id', type=int)  # puede venir 0
 
+    # 👉 archivos adjuntos del formulario (name="files")
+    files = request.files.getlist("files")  # importante que el name del input sea "files"
+
+    # DEBUG duro para ver qué llega realmente
+    print("DEBUG FILES RAW:", request.files)
+    print("DEBUG getlist('files'):", [f.filename for f in files])
+
     # Fallback de autoasignación en backend
     if (not assignee_id) and department_id:
         abd = svc.analysts_by_dept_map()
         lst = abd.get(int(department_id), [])
         if lst:
-            assignee_id = int(lst[0]['id'])  # toma el primero pero revisemos si luego lo cambio
+            assignee_id = int(lst[0]['id'])  # toma el primero
 
     try:
+        # 1) Crear el ticket
         created = svc.create(
             requester_id=current_user.id,
             subject=subject,
@@ -82,8 +93,22 @@ def create_post():
             priority_id=priority_id,
             assignee_id=assignee_id if assignee_id else None
         )
+
+        # 2) Guardar adjuntos (si hay)
+        upload_dir = current_app.config.get("UPLOAD_FOLDER", "var/uploads")
+        for f in files:
+            if not f or not f.filename:
+                print("no hay archivos")
+                continue
+            try:
+                svc.add_attachment(created.id, current_user.id, f, upload_dir)
+            except ValueError:
+                current_app.logger.warning("Adjunto inválido al crear ticket", exc_info=True)
+
+        # 3) Ir al detalle
         return redirect(url_for('tickets.detail', ticket_id=created.id))
-    except Exception as e:
+
+    except Exception:
         current_app.logger.exception("Error creando ticket")
         return redirect(url_for('tickets.create'))
 
@@ -233,9 +258,9 @@ def upload(ticket_id):
     file = request.files.get("file")
     try:
         att_id = svc.add_attachment(ticket_id, current_user.id, file, current_app.config.get("UPLOAD_FOLDER", "var/uploads"))
-        flash("Archivo adjuntado.", "success")
+        print("Archivo adjuntado.", "success")
     except ValueError as e:
-        flash(str(e), "error")
+        print(str(e), "error")
     return redirect(url_for('tickets.detail', ticket_id=ticket_id))
 
 # ===== DESCARGA SEGURA =====
@@ -295,12 +320,129 @@ def mine():
     )
 
 
-
-# ====== PLACEHOLDERS (para evitar errores 404/BuildError) ======
-
-@tickets.route('/reports', endpoint='reports')
+# ===== DESCARGA REPORTES =====
+@tickets.get('/mine/export', endpoint='mine_export')
 @login_required
-def reports():
-    return render_template('tickets/placeholder.html', title='Reportes')
+def mine_export():
+    svc = TicketService(TicketRepository())
+
+    # Mismos filtros que en /mine
+    q            = request.args.get("q") or None
+    status_id    = request.args.get("status_id", type=int)
+    priority_id  = request.args.get("priority_id", type=int)
+    category_id  = request.args.get("category_id", type=int)
+    date_from    = request.args.get("from") or None
+    date_to      = request.args.get("to") or None
+
+    # Roles del usuario
+    roles = [r.name for r in getattr(current_user, "roles", [])] if hasattr(current_user, "roles") else []
+    roles_up = {(r or "").upper() for r in roles}
+    is_admin     = "ADMIN" in roles_up
+    is_requester = "REQUESTER" in roles_up
+    is_analyst = "ANALYST" in roles_up
+
+    if not (is_admin or is_requester or is_analyst):
+        abort(403)
+
+    # Traer datos con el mismo alcance por rol, pero sin paginar (per_page grande)
+    data = svc.scoped_list(
+        current_user.id, roles,
+        q=q, status_id=status_id, priority_id=priority_id, category_id=category_id,
+        date_from=date_from, date_to=date_to,
+        page=1, per_page=100000  # suficiente para exportar muchos registros
+    )
+    rows = data["items"]
+
+    # Construir CSV en memoria
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Encabezados
+    writer.writerow([
+        "Código",
+        "Asunto",
+        "Solicitante",
+        "Asignado a",
+        "Categoría",
+        "Prioridad",
+        "Estado",
+        "Actualizado"
+    ])
+
+    # Filas
+    for t in rows:
+        writer.writerow([
+            t.get("code", ""),
+            t.get("title", ""),
+            t.get("requester_name", ""),
+            t.get("assignee_name") or "",
+            t.get("category_name") or "",
+            t.get("priority_name", ""),
+            t.get("status_name", ""),
+            t.get("updated_at", ""),
+        ])
+
+    # Pasar a bytes para send_file
+    mem = io.BytesIO()
+    mem.write(output.getvalue().encode("utf-8-sig"))  # BOM para que Excel lo lea bonito
+    mem.seek(0)
+
+    filename = "tickets_reporte.csv"
+
+    return send_file(
+        mem,
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name=filename
+    )
+
+
+# ===== Sugerencias de la IA =====
+@tickets.post("/ai/suggest", endpoint="ai_suggest")
+@login_required
+def ai_suggest():
+    """
+    Endpoint AJAX que la UI usa para pedir sugerencias a la IA.
+    Espera JSON: { "title": "...", "description": "..." }
+    Devuelve JSON: { category_id, priority_id, department_id, reason? }
+    NUNCA devuelve 400/500 (así el front no se rompe).
+    """
+    from src.infrastructure.ai.gemini_client import suggest_ticket_metadata
+
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    description = (data.get("description") or "").strip()
+
+    # Si no hay nada que analizar, no es error: simplemente no sugerimos nada
+    if not title and not description:
+        return jsonify({"skipped": True}), 200
+
+    try:
+        svc = TicketService(TicketRepository())
+        cats = svc.catalogs()  # categorías, prioridades, departamentos desde BD
+
+        suggestion = suggest_ticket_metadata(
+            title=title,
+            description=description,
+            categories=cats.categories,
+            priorities=cats.priorities,
+            departments=cats.departments,
+        ) or {}
+
+        # Esperado algo tipo:
+        # { "category_id": int | None,
+        #   "priority_id": int | None,
+        #   "department_id": int | None,
+        #   "reason": str? }
+        return jsonify(suggestion), 200
+
+    except Exception as e:
+        current_app.logger.exception("Error llamando a Gemini")
+        # También devolvemos 200, pero con marca de error para que el front decida ignorar
+        return jsonify({
+            "error": "ia_error",
+            "detail": str(e),
+        }), 200
+
 
 

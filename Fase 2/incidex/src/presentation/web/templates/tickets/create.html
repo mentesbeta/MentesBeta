@@ -3,19 +3,6 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/tickets.css') }}">
-<style>
-  /* Chips de archivos a adjuntar */
-  .file-list { list-style:none; padding:0; margin:.35rem 0 0; display:flex; flex-wrap:wrap; gap:8px; }
-  .file-chip { display:inline-flex; align-items:center; gap:6px; padding:.35rem .55rem; border-radius:999px;
-               background:#eef4ff; border:1px solid #cfe0ff; color:#0b2f69; font-size:.9rem; }
-  .file-chip .remove { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px;
-                       border-radius:50%; background:#0b2f69; color:#fff; font-weight:700; line-height:1;
-                       cursor:pointer; border:0; }
-  .file-chip .remove:hover { filter:brightness(1.1); }
-
-  /* Select deshabilitado (solo visual) */
-  .input.-readonly { background:#f7f7f9; color:#6b7280; pointer-events:none; }
-</style>
 {% endblock %}
 
 {% block content %}
@@ -39,6 +26,11 @@
     <div class="step__body">
       <p class="muted">Ingresa los datos principales…</p>
 
+      <div id="aiSpinner" class="ai-spinner" hidden>
+        <span class="ai-spinner__dot"></span>
+        <span>Analizando con IA…</span>
+      </div>
+
       <div class="grid-2 gap-md">
         <div class="form__group">
           <label for="title">Título del ticket</label>
@@ -52,20 +44,16 @@
             placeholder="Describe con detalle…" required></textarea>
         </div>
 
-        <!-- Adjuntos con previsualización y eliminar -->
         <div class="form__group grid-col-span-2">
-          <div class="form__row between">
-            <label>Archivos adjuntos</label>
-            <label class="btn btn-dark btn-sm" for="files">Adjuntar</label>
+          <div class="attachments-head">
+            <label class="btn btn-outline btn-sm btn-file-trigger" for="files">Adjuntar Documentos</label>
             <input id="files" name="files" type="file" multiple hidden>
           </div>
           <ul id="fileList" class="file-list" aria-live="polite"></ul>
+          <div class="step__actions">
+            <button type="button" class="btn btn-primary js-next">Siguiente</button>
+          </div>
         </div>
-      </div>
-
-      <div class="step__actions">
-        <button type="button" class="btn btn-primary js-next">Siguiente</button>
-      </div>
     </div>
   </section>
 
