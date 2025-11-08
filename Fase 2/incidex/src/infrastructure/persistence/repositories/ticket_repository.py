@@ -37,8 +37,10 @@ class TicketDetail:
     category_name: str | None
     priority_name: str
     status_name: str
+    department_name: str | None 
     created_at: str
     updated_at: str
+
 
 def _coalesce_int(v, default=None):
     try:
@@ -194,25 +196,29 @@ class TicketRepository:
     # ==== DETALLE ====
     def detail(self, ticket_id: int):
         row = db.session.execute(text("""
-        SELECT t.id, t.code, t.title, t.description,
-               t.requester_id,
-               CONCAT(rq.names_worker, ' ', rq.last_name) AS requester_name,
-               t.assignee_id,
-               CASE WHEN asg.id IS NULL THEN NULL ELSE CONCAT(asg.names_worker, ' ', asg.last_name) END AS assignee_name,
-               c.name AS category_name,
-               p.name AS priority_name,
-               s.name AS status_name,
-               DATE_FORMAT(t.created_at,  '%Y-%m-%d %H:%i') AS created_at,
-               DATE_FORMAT(t.updated_at,  '%Y-%m-%d %H:%i') AS updated_at
-        FROM tickets t
-        JOIN users rq   ON rq.id = t.requester_id
-        LEFT JOIN users asg ON asg.id = t.assignee_id
-        LEFT JOIN categories c ON c.id = t.category_id
-        JOIN priorities p ON p.id = t.priority_id
-        JOIN statuses   s ON s.id = t.status_id
-        WHERE t.id = :tid
+            SELECT t.id, t.code, t.title, t.description,
+                t.requester_id,
+                CONCAT(rq.names_worker, ' ', rq.last_name) AS requester_name,
+                t.assignee_id,
+                CASE WHEN asg.id IS NULL THEN NULL ELSE CONCAT(asg.names_worker, ' ', asg.last_name) END AS assignee_name,
+                c.name AS category_name,
+                p.name AS priority_name,
+                s.name AS status_name,
+                d.name AS department_name,
+                DATE_FORMAT(t.created_at,  '%Y-%m-%d %H:%i') AS created_at,
+                DATE_FORMAT(t.updated_at,  '%Y-%m-%d %H:%i') AS updated_at
+            FROM tickets t
+            JOIN users rq   ON rq.id = t.requester_id
+            LEFT JOIN users asg ON asg.id = t.assignee_id
+            LEFT JOIN categories c ON c.id = t.category_id
+            JOIN priorities p ON p.id = t.priority_id
+            JOIN statuses   s ON s.id = t.status_id
+            LEFT JOIN departments d ON d.id = t.department_id
+            WHERE t.id = :tid
         """), {"tid": ticket_id}).mappings().first()
         return TicketDetail(**row) if row else None
+
+
 
     def comments(self, ticket_id: int):
         return db.session.execute(text("""
@@ -299,10 +305,18 @@ class TicketRepository:
     # ====== AUX: datos mínimos / permisos ======
     def get_ticket_minimal(self, ticket_id: int):
         return db.session.execute(text("""
-            SELECT id, assignee_id, status_id
+            SELECT
+              id,
+              code,
+              requester_id,
+              assignee_id,
+              department_id,
+              status_id
             FROM tickets
             WHERE id = :tid
         """), {"tid": ticket_id}).mappings().first()
+
+
 
     def get_user_fullname(self, user_id: int | None) -> str | None:
         if not user_id:
@@ -319,44 +333,76 @@ class TicketRepository:
         """), {"uid": user_id}).first()
         return row[0] if row else None
 
+    
     # ====== HISTORIAL: cambio de estado / asignación ======
-    def update_status_with_history(self, *, ticket_id: int, to_status_id: int, actor_user_id: int, note: str | None = None):
-        try:
-            cur = db.session.execute(text("""
-                SELECT status_id
-                FROM tickets
-                WHERE id = :tid
-                FOR UPDATE
-            """), {"tid": ticket_id}).first()
-            if not cur:
-                raise ValueError("Ticket no encontrado")
+    def update_status_with_history(
+            self,
+            *,
+            ticket_id: int,
+            to_status_id: int,
+            actor_user_id: int,
+            note: str | None = None
+        ):
+            try:
+                # Bloqueamos el ticket actual y leemos el estado actual
+                cur = db.session.execute(text("""
+                    SELECT status_id
+                    FROM tickets
+                    WHERE id = :tid
+                    FOR UPDATE
+                """), {"tid": ticket_id}).first()
 
-            from_status_id = int(cur[0])
+                if not cur:
+                    raise ValueError("Ticket no encontrado")
 
-            db.session.execute(text("""
-                UPDATE tickets
-                SET status_id = :to_status_id,
-                    updated_at = NOW()
-                WHERE id = :tid
-            """), {"to_status_id": int(to_status_id), "tid": ticket_id})
+                from_status_id = int(cur[0])
 
-            db.session.execute(text("""
-                INSERT INTO ticket_history
-                    (ticket_id, actor_user_id, from_status_id, to_status_id, note, created_at)
-                VALUES
-                    (:tid, :actor, :froms, :tos, :note, NOW())
-            """), {
-                "tid": ticket_id,
-                "actor": actor_user_id,
-                "froms": from_status_id,
-                "tos": int(to_status_id),
-                "note": (note or "").strip() or None
-            })
+                # Averiguamos el nombre del estado destino para saber si es RESUELTO / CERRADO
+                status_name = (self.get_status_name(int(to_status_id)) or "").upper()
+                set_resolved = 1 if status_name == "RESUELTO" else 0
+                set_closed   = 1 if status_name == "CERRADO" else 0
 
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            raise
+                # Actualizamos el ticket
+                db.session.execute(text("""
+                    UPDATE tickets
+                    SET
+                        status_id  = :to_status_id,
+                        updated_at = NOW(),
+                        resolved_at = CASE
+                            WHEN :set_resolved = 1 AND resolved_at IS NULL THEN NOW()
+                            ELSE resolved_at
+                        END,
+                        closed_at = CASE
+                            WHEN :set_closed = 1 AND closed_at IS NULL THEN NOW()
+                            ELSE closed_at
+                        END
+                    WHERE id = :tid
+                """), {
+                    "to_status_id": int(to_status_id),
+                    "tid": ticket_id,
+                    "set_resolved": set_resolved,
+                    "set_closed": set_closed,
+                })
+
+                # Registramos en historial
+                db.session.execute(text("""
+                    INSERT INTO ticket_history
+                        (ticket_id, actor_user_id, from_status_id, to_status_id, note, created_at)
+                    VALUES
+                        (:tid, :actor, :froms, :tos, :note, NOW())
+                """), {
+                    "tid": ticket_id,
+                    "actor": actor_user_id,
+                    "froms": from_status_id,
+                    "tos": int(to_status_id),
+                    "note": (note or "").strip() or None
+                })
+
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                raise
+
 
     def update_assignee_with_history(self, *, ticket_id: int, new_assignee_id: int | None, actor_user_id: int, note: str | None = None):
         try:
@@ -552,3 +598,99 @@ class TicketRepository:
         params = {"dep": int(department_id), "uid": int(user_id)}
         self._apply_common_filters(where, params, q, status_id, priority_id, category_id, date_from, date_to)
         return self._paged_items(" AND ".join(where), params, page, per_page, include_role_for=user_id)
+    
+    # --- ANALYST se le asigna cuando tiene poca carga ---
+
+    def list_analysts_by_department_with_load(self):
+        """
+        Retorna analistas por departamento junto con su carga actual
+        (cantidad de tickets abiertos asignados).
+        Carga = tickets en estados NUEVO, ASIGNADO, EN_PROGRESO.
+        """
+        sql = """
+        SELECT
+            u.id,
+            u.department_id,
+            CONCAT(u.names_worker, ' ', u.last_name) AS full_name,
+            COALESCE(SUM(
+                CASE
+                    WHEN s.name IN ('NUEVO','ASIGNADO','EN_PROGRESO') THEN 1
+                    ELSE 0
+                END
+            ), 0) AS open_count
+        FROM users u
+        JOIN user_roles ur ON ur.user_id = u.id
+        JOIN roles r       ON r.id = ur.role_id
+        LEFT JOIN tickets t   ON t.assignee_id = u.id
+        LEFT JOIN statuses s  ON s.id = t.status_id
+        WHERE u.is_active = 1
+          AND u.department_id IS NOT NULL
+          AND UPPER(r.name) = 'ANALYST'
+        GROUP BY u.id, u.department_id, full_name
+        ORDER BY u.department_id, open_count ASC, full_name ASC
+        """
+        return db.session.execute(text(sql)).mappings().all()
+
+    def get_least_busy_analyst_by_department(self, department_id: int):
+        """
+        Retorna el analista del departamento con menor carga de tickets abiertos.
+        Si hay empate, retorna el primero alfabéticamente.
+        """
+        sql = """
+        SELECT 
+            u.id,
+            CONCAT(u.names_worker, ' ', u.last_name) AS full_name,
+            COUNT(t.id) AS open_count
+        FROM users u
+        JOIN user_roles ur ON ur.user_id = u.id
+        JOIN roles r ON r.id = ur.role_id
+        LEFT JOIN tickets t ON t.assignee_id = u.id AND t.status_id IN (
+            SELECT id FROM statuses WHERE name IN ('NUEVO','ASIGNADO','EN_PROGRESO')
+        )
+        WHERE 
+            u.is_active = 1
+            AND u.department_id = :dept
+            AND UPPER(r.name) = 'ANALYST'
+        GROUP BY u.id, full_name
+        ORDER BY open_count ASC, full_name ASC
+        LIMIT 1
+        """
+        return db.session.execute(text(sql), {"dept": int(department_id)}).mappings().first()
+    
+    # ===== Notificaciones =====
+    def insert_notification(self, *, user_id: int, ticket_id: int,
+                            kind: str, message: str):
+        db.session.execute(text("""
+            INSERT INTO ticket_notifications (user_id, ticket_id, kind, message)
+            VALUES (:u, :t, :k, :m)
+        """), {
+            "u": int(user_id),
+            "t": int(ticket_id),
+            "k": kind,
+            "m": message[:255],
+        })
+        db.session.commit()
+
+    def list_unread_notifications(self, user_id: int, limit: int = 10):
+        return db.session.execute(text("""
+            SELECT
+              id,
+              ticket_id,
+              kind,
+              message,
+              is_read,
+              DATE_FORMAT(created_at, '%Y-%m-%d %H:%i') AS created_at
+            FROM ticket_notifications
+            WHERE user_id = :u AND is_read = 0
+            ORDER BY created_at DESC
+            LIMIT :lim
+        """), {"u": int(user_id), "lim": int(limit)}).mappings().all()
+
+    def mark_all_notifications_read_for_user(self, user_id: int):
+        db.session.execute(text("""
+            UPDATE ticket_notifications
+            SET is_read = 1
+            WHERE user_id = :u AND is_read = 0
+        """), {"u": int(user_id)})
+        db.session.commit()
+

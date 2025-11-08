@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from src.infrastructure.ai.gemini_client import suggest_ticket_metadata
 
-ADMIN_ROLES = {"ADMIN", "ANALYST"}
+ADMIN_ROLES = {"ADMIN"}
 
 @dataclass
 class CatalogsDTO:
@@ -102,11 +102,39 @@ class TicketService:
     def _has_role(self, roles: list[str]) -> bool:
         return any((r or "").upper() in ADMIN_ROLES for r in (roles or []))
 
+    # == permisos para asignar ==
     def detail(self, ticket_id: int, viewer_id: int, viewer_roles: list[str]) -> TicketBundle | None:
         t = self.repo.detail(ticket_id)
         if not t:
             return None
-        can_act = (t.assignee_id == viewer_id) or self._has_role(viewer_roles)
+
+        roles_up = {(r or "").upper() for r in (viewer_roles or [])}
+        is_admin = "ADMIN" in roles_up
+        is_analyst = "ANALYST" in roles_up
+
+        # depto del ticket y del usuario
+        ticket_dept_id = getattr(t, "department_id", None)
+        user_dept_id = self.repo.get_user_department_id(viewer_id)
+
+        same_dept = (
+            ticket_dept_id is not None
+            and user_dept_id is not None
+            and int(ticket_dept_id) == int(user_dept_id)
+        )
+
+        # Reglas de quién puede "actuar" (cambiar estado / asignar)
+        can_act = False
+
+        if is_admin:
+            can_act = True
+        elif is_analyst and same_dept:
+            # Analista SOLO si es del mismo departamento
+            can_act = True
+
+        # El asignado SIEMPRE puede actuar sobre su ticket (rol aparte)
+        if t.assignee_id == viewer_id:
+            can_act = True
+
         return TicketBundle(
             ticket=t.__dict__,
             comments=self.repo.comments(ticket_id),
@@ -114,6 +142,8 @@ class TicketService:
             history=self.repo.history(ticket_id),
             can_act=can_act
         )
+
+
 
     def add_comment(self, ticket_id: int, author_id: int, text: str):
         text = (text or "").strip()
@@ -254,91 +284,165 @@ class TicketService:
         actor_roles: list[str],
         to_status_id: int,
         note: str | None = None
-    ):
-        tmin = self.repo.get_ticket_minimal(ticket_id)
-        if not tmin:
-            raise ValueError("Ticket no existe")
+        ):
+            tmin = self.repo.get_ticket_minimal(ticket_id)
+            if not tmin:
+                raise ValueError("Ticket no existe")
 
-        roles_up = {(r or "").upper() for r in (actor_roles or [])}
-        is_admin    = "ADMIN" in roles_up
-        is_analyst  = "ANALYST" in roles_up
-        is_request  = "REQUESTER" in roles_up
-        is_assignee = (tmin.get("assignee_id") == actor_id)
+            roles_up = {(r or "").upper() for r in (actor_roles or [])}
+            is_admin    = "ADMIN" in roles_up
+            is_analyst  = "ANALYST" in roles_up
+            is_request  = "REQUESTER" in roles_up
 
-        if int(tmin["status_id"]) == int(to_status_id):
-            return
+            requester_id = tmin.get("requester_id")
+            assignee_id  = tmin.get("assignee_id")
+            status_id    = tmin.get("status_id")
 
-        target_name = (self.repo.get_status_name(int(to_status_id)) or "").upper()
+            is_assignee       = (assignee_id == actor_id)
+            is_ticket_creator = (requester_id == actor_id)
 
-        def can_change_to(target: str) -> bool:
-            t = (target or "").upper()
+            # nombre del nuevo estado
+            target_name = (self.repo.get_status_name(int(to_status_id)) or "").upper()
 
-            if is_admin:
-                return True  # admin manda
+            # --- Validación normal de permisos ---
+            def can_change_to(target: str) -> bool:
+                t = (target or "").upper()
 
-            # Analista (agregamos CERRADO)
-            if is_analyst:
-                if t in {"EN_PROGRESO", "ASIGNADO", "RECHAZADO", "CERRADO"}:
+                if is_admin:
                     return True
+
+                # Analista puede pasar por todo el flujo técnico
+                if is_analyst:
+                    return t in {"EN_PROGRESO", "ASIGNADO", "RECHAZADO", "CERRADO"}
+
+                # Requester puede marcar resuelto si lo creó
+                if is_request and t == "RESUELTO":
+                    return True
+
+                # Cualquier asignado puede avanzar a EN_PROGRESO
+                if is_assignee and t == "EN_PROGRESO":
+                    return True
+
                 return False
 
-            # Requester (solo si es el asignado)
-            if is_request:
-                if t in {"EN_PROGRESO"} and is_assignee:
-                    return True
-                if t in {"RESUELTO"} and is_assignee:
-                    return True
-                return False
+            if not can_change_to(target_name):
+                raise PermissionError("No tienes permiso para cambiar a este estado")
 
-            # Otros: solo EN_PROGRESO si es el asignado
-            if t == "EN_PROGRESO" and is_assignee:
-                return True
+            # --- Actualizamos el estado ---
+            self.repo.update_status_with_history(
+                ticket_id=ticket_id,
+                to_status_id=int(to_status_id),
+                actor_user_id=actor_id,
+                note=note,
+            )
 
-            return False
+            # --- NUEVO: si pasa a RESUELTO por un requester ---
+            if target_name == "RESUELTO":
+                # buscamos depto del ticket
+                dept_id = self.repo.get_ticket_minimal(ticket_id).get("department_id")
+                if dept_id:
+                    # elegimos el analista con menor carga
+                    analyst = self.repo.get_least_busy_analyst_by_department(dept_id)
+                    if analyst:
+                        self.repo.update_assignee_with_history(
+                            ticket_id=ticket_id,
+                            new_assignee_id=analyst["id"],
+                            actor_user_id=actor_id,
+                            note="Autoasignado al analista para revisión y cierre (flujo automático)",
+                        )
+            
+            # Notificación para el solicitante cuando se RESUELVE o se CIERRA
+            tmin = self.repo.get_ticket_minimal(ticket_id)
+            if tmin:
+                requester_id = tmin.get("requester_id")
+                code = tmin.get("code")
+                target_name = (self.repo.get_status_name(int(to_status_id)) or "").upper()
 
-        # Restricción dura solo para NUEVO (reapertura “limpia”)
-        if not is_admin and target_name == "NUEVO":
-            raise PermissionError("Solo ADMIN puede poner un ticket en NUEVO")
+                if requester_id and target_name in {"RESUELTO", "CERRADO"}:
+                    if target_name == "RESUELTO":
+                        msg = f"Tu ticket {code} ha sido marcado como RESUELTO."
+                        kind = "RESOLVED"
+                    else:
+                        msg = f"Tu ticket {code} ha sido CERRADO."
+                        kind = "CLOSED"
 
-        if not can_change_to(target_name):
-            raise PermissionError("No tienes permiso para cambiar a este estado")
+                    self.repo.insert_notification(
+                        user_id=int(requester_id),
+                        ticket_id=ticket_id,
+                        kind=kind,
+                        message=msg,
+                    )
 
-        self.repo.update_status_with_history(
-            ticket_id=ticket_id,
-            to_status_id=int(to_status_id),
-            actor_user_id=actor_id,
-            note=note,
-        )
 
     # ===== Reasignar =====
-    def reassign(self, *, ticket_id: int, actor_id: int, actor_roles: list[str] | None, new_assignee_id: int | None, note: str | None = None):
-        tmin = self.repo.get_ticket_minimal(ticket_id)
-        if not tmin:
-            raise ValueError("Ticket no existe")
-        roles_up = {(r or "").upper() for r in (actor_roles or [])}
-        is_admin    = "ADMIN" in roles_up
-        is_analyst  = "ANALYST" in roles_up
-        is_assignee = (tmin["assignee_id"] == actor_id)
-        if not (is_admin or is_analyst or is_assignee):
-            raise PermissionError("No autorizado para reasignar este ticket")
-        if tmin["assignee_id"] == new_assignee_id:
-            return
-        if not is_admin:
-            if new_assignee_id is None:
+    def reassign(
+            self,
+            *,
+            ticket_id: int,
+            actor_id: int,
+            actor_roles: list[str] | None,
+            new_assignee_id: int | None,
+            note: str | None = None
+        ):
+            tmin = self.repo.get_ticket_minimal(ticket_id)
+            if not tmin:
+                raise ValueError("Ticket no existe")
+
+            roles_up = {(r or "").upper() for r in (actor_roles or [])}
+            is_admin = "ADMIN" in roles_up
+            is_analyst = "ANALYST" in roles_up
+
+            ticket_dept_id = tmin.get("department_id")
+            user_dept_id = self.repo.get_user_department_id(actor_id)
+
+            # Solo admin o analista del mismo depto
+            if not is_admin:
+                if not is_analyst or not ticket_dept_id or ticket_dept_id != user_dept_id:
+                    raise PermissionError("No tienes permiso para reasignar este ticket")
+
+            # Si intenta reasignar al mismo usuario → ignoramos
+            if tmin["assignee_id"] == new_assignee_id:
+                return
+
+            # Validar destinatario válido
+            if not new_assignee_id:
                 raise PermissionError("Debes seleccionar un destinatario válido")
-            allowed = self.repo.is_requester_same_dept(actor_id, int(new_assignee_id))
-            if not allowed:
-                raise PermissionError("Solo puedes asignar a REQUESTER de tu mismo departamento")
-        self.repo.update_assignee_with_history(
-            ticket_id=ticket_id, new_assignee_id=int(new_assignee_id) if new_assignee_id is not None else None,
-            actor_user_id=actor_id, note=note
-        )
+
+            # Actualizamos con historial
+            self.repo.update_assignee_with_history(
+                ticket_id=ticket_id,
+                new_assignee_id=int(new_assignee_id),
+                actor_user_id=actor_id,
+                note=note,
+            )
+
+            # Notificación para el nuevo asignado
+            tmin = self.repo.get_ticket_minimal(ticket_id)
+            if tmin and new_assignee_id:
+                msg = f"Se te ha asignado el ticket {tmin['code']}."
+                self.repo.insert_notification(
+                    user_id=int(new_assignee_id),
+                    ticket_id=ticket_id,
+                    kind="ASSIGNED",
+                    message=msg,
+                )
+
 
     # ===== Apoyo front (autoasignar por depto) =====
+
     def analysts_by_dept_map(self) -> dict[int, list[dict]]:
-        rows = self.repo.list_analysts_by_department()
+        """
+        Devuelve { dept_id: [ {id, full_name, load}, ... ] }.
+        La lista ya viene ordenada por menor carga, luego por nombre.
+        """
+        rows = self.repo.list_analysts_by_department_with_load()
         out: dict[int, list[dict]] = {}
         for r in rows:
             did = int(r["department_id"]) if r["department_id"] is not None else 0
-            out.setdefault(did, []).append({"id": int(r["id"]), "full_name": r["full_name"]})
+            out.setdefault(did, []).append({
+                "id": int(r["id"]),
+                "full_name": r["full_name"],
+                "load": int(r["open_count"] or 0),
+            })
         return out
+

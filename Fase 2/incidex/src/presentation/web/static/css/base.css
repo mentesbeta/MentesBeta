@@ -34,3 +34,146 @@ main { flex: 1; }
   max-width: 800px;
   margin: .35rem auto 0;
 }
+
+
+/* ==================================================================== campana ==================================================================== */
+
+/* Contenedor derecha: campana + usuario */
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Campana */
+.notif-menu {
+  position: relative;
+}
+
+.notif-btn {
+  position: relative;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  color: #0b2f69; /* puedes ajustarlo al color de tus links */
+}
+
+.site-header--light .notif-btn {
+  color: #111827;
+}
+
+.notif-icon {
+  width: 22px;
+  height: 22px;
+}
+
+/* Badge rojo */
+.notif-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translate(40%, -40%);
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.7rem;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 999px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* Dropdown */
+.notif-dropdown {
+  position: absolute;
+  right: 0;
+  top: 130%;
+  width: 280px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem 0.75rem;
+  z-index: 40;
+}
+
+.notif-dropdown__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.notif-dropdown__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.notif-dropdown__list li {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 0.85rem;
+}
+
+.notif-dropdown__list li:last-child {
+  border-bottom: none;
+}
+
+.notif-msg {
+  color: #111827;
+  margin-bottom: 0.15rem;
+}
+
+.notif-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.notif-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  color: #1e63d1;
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.notif-link:hover {
+  text-decoration: underline;
+}
+
+.notif-empty {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+/* Ajuste para que user-menu no se pegue demasiado */
+.user-menu {
+  position: relative;
+}
+
+.notif-header-form{
+  display:inline-block;
+  margin:0;
+}
+.notif-header-form .notif-link{
+  padding:0;
+  border:none;
+  background:none;
+  cursor:pointer;
+}

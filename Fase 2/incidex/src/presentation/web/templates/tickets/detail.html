@@ -25,6 +25,7 @@
       <div><strong>Asignado a:</strong> {{ ticket.assignee_name or "—" }}</div>
       <div><strong>Creado:</strong> {{ ticket.created_at }}</div>
       <div><strong>Actualizado:</strong> {{ ticket.updated_at }}</div>
+      <div><strong>Departamento:</strong> {{ ticket.department_name or '—' }}</div>
     </div>
 
     <div class="grid-2 gap-md">
@@ -49,7 +50,7 @@
           {% endfor %}
         </ul>
 
-        {% if can_act %}
+        {% if ticket %}
         <form action="{{ url_for('tickets.comment', ticket_id=ticket.id) }}" method="post" class="comment-form">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <textarea name="body" rows="3" class="textarea" placeholder="Escribe un comentario..."></textarea>
@@ -95,27 +96,29 @@
         </section>
 
         <!-- ===== Asignar a ===== -->
-        <section class="card" aria-label="Asignar a">
-          <h3>Asignar a</h3>
-          <form id="assignForm" action="{{ url_for('tickets.assign', ticket_id=ticket.id) }}" method="post">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" id="hidden_assignee_id" name="assignee_id">
-            <input type="hidden" id="hidden_assign_note" name="note">
+        {% if is_admin or is_analyst %}
+          <section class="card" aria-label="Asignar a">
+            <h3>Asignar a</h3>
+            <form id="assignForm" action="{{ url_for('tickets.assign', ticket_id=ticket.id) }}" method="post">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" id="hidden_assignee_id" name="assignee_id">
+              <input type="hidden" id="hidden_assign_note" name="note">
 
-            <div class="form__group">
-              <select id="assignee_id_select" class="input" required
-                      data-prev="{{ current_assignee_id or '' }}">
-                <option value="">— Selecciona —</option>
-                {% for u in assignables %}
-                  <option value="{{ u.id }}" {{ 'selected' if current_assignee_id==u.id else '' }}>
-                    {{ u.full_name }}
-                  </option>
-                {% endfor %}
-              </select>
-            </div>
-            {# Sin botón; el modal se abre al cambiar el select #}
-          </form>
-        </section>
+              <div class="form__group">
+                <select id="assignee_id_select" class="input" required
+                        data-prev="{{ current_assignee_id or '' }}">
+                  <option value="">— Selecciona —</option>
+                  {% for u in assignables %}
+                    <option value="{{ u.id }}" {{ 'selected' if current_assignee_id==u.id else '' }}>
+                      {{ u.full_name }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+              {# Sin botón; el modal se abre al cambiar el select #}
+            </form>
+          </section>
+          {% endif %}
         {% endif %}
 
         <!-- Adjuntos (debajo) -->
@@ -132,7 +135,7 @@
             {% endfor %}
           </ul>
 
-          {% if can_act %}
+          {% if ticket %}
           <form action="{{ url_for('tickets.upload', ticket_id=ticket.id) }}" method="post" enctype="multipart/form-data" class="upload-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input id="fileInput" type="file" name="file" class="file-input-hidden" required>

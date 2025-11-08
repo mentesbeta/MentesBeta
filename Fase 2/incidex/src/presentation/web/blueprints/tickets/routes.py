@@ -68,7 +68,7 @@ def create_post():
     priority_id    = request.form.get('priority_id', type=int)
     assignee_id    = request.form.get('assignee_id', type=int)  # puede venir 0
 
-    # 👉 archivos adjuntos del formulario (name="files")
+    # archivos adjuntos del formulario (name="files")
     files = request.files.getlist("files")  # importante que el name del input sea "files"
 
     # DEBUG duro para ver qué llega realmente
@@ -233,8 +233,6 @@ def add_comment(ticket_id):
     bundle = svc.detail(ticket_id, viewer_id=current_user.id, viewer_roles=roles)
     if not bundle:
         abort(404)
-    if not bundle.can_act:
-        abort(403)
 
     try:
         svc.add_comment(ticket_id, current_user.id, request.form.get("body", ""))
@@ -252,8 +250,6 @@ def upload(ticket_id):
     bundle = svc.detail(ticket_id, viewer_id=current_user.id, viewer_roles=roles)
     if not bundle:
         abort(404)
-    if not bundle.can_act:
-        abort(403)
 
     file = request.files.get("file")
     try:
@@ -275,6 +271,7 @@ def download(ticket_id, att_id):
     return send_file(meta["file_path"], as_attachment=True, download_name=meta["file_name"])
 
 
+# ===== Listar Tickets a tu dep =====
 @tickets.route('/mine', endpoint='mine')
 @login_required
 def mine():
@@ -445,4 +442,34 @@ def ai_suggest():
         }), 200
 
 
+# ====== CONTEXTO GLOBAL (para header) ======
+@tickets.app_context_processor
+def inject_ticket_notifications():
+    if not current_user.is_authenticated:
+        return {}
+    try:
+        repo = TicketRepository()
+        notifs = repo.list_unread_notifications(current_user.id, limit=10)
+        return {
+            "header_notifications": notifs,
+            "header_notifications_unread": len([n for n in notifs if not n["is_read"]]),
+        }
+    except Exception as e:
+        current_app.logger.warning(f"Error cargando notificaciones: {e}")
+        return {
+            "header_notifications": [],
+            "header_notifications_unread": 0,
+        }
 
+@tickets.post("/notifications/read-all", endpoint="notifications_read_all")
+@login_required
+def notifications_read_all():
+    """
+    Marca como leídas todas las notificaciones del usuario actual
+    y vuelve a la página desde donde vino.
+    """
+    repo = TicketRepository()
+    repo.mark_all_notifications_read_for_user(current_user.id)
+
+    # Volver a la página anterior o, si no hay referrer, al dashboard
+    return redirect(request.referrer or url_for('tickets.dashboard'))
