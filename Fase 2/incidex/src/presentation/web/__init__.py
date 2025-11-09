@@ -30,6 +30,17 @@ def create_app():
     # iniciar modelos
     import src.domain.entities 
 
+    # ==== CONFIG EMAIL (desde .env) ====
+    app.config["SUPPORT_EMAIL_TO"]   = os.getenv("SUPPORT_EMAIL_TO", "incidexadm@gmail.com")
+    app.config["SUPPORT_EMAIL_FROM"] = os.getenv("SUPPORT_EMAIL_FROM", app.config["SUPPORT_EMAIL_TO"])
+
+    app.config["MAIL_SERVER"]   = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+    app.config["MAIL_PORT"]     = int(os.getenv("MAIL_PORT", "587"))
+    app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")
+    app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
+
+    app.config["MAIL_USE_TLS"] = os.getenv("MAIL_USE_TLS", "True").lower() == "true"
+    app.config["MAIL_USE_SSL"] = os.getenv("MAIL_USE_SSL", "False").lower() == "true"
 
     # ==== Migrate ====
     Migrate(app, db, compare_type=True)
@@ -37,12 +48,11 @@ def create_app():
     # ==== CSRF global ====
     CSRFProtect(app)
 
-    # ==== Prueba borrar ====
+    # ==== Prueba  ====
     app.config.setdefault("UPLOAD_FOLDER", os.path.join(os.getcwd(), "var", "uploads"))
     upload_base = os.path.join(os.getcwd(), "var", "uploads")
     os.makedirs(upload_base, exist_ok=True)
     app.config["UPLOAD_FOLDER"] = upload_base
-
 
 
     @app.context_processor

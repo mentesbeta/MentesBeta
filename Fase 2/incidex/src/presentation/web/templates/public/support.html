@@ -16,22 +16,43 @@
       <h2>Contáctanos</h2>
       <p>Puedes comunicarte con nuestro equipo técnico o de soporte completando el siguiente formulario.  
          También puedes escribirnos a <a href="mailto:soporte@incidex.cl">soporte@incidex.cl</a>.</p>
+        <form class="form card -elev" method="post" action="{{ url_for('public.support') }}">
+          {# CSRF (si usas CSRFProtect / Flask-WTF) #}
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-      <form class="form card -elev" method="post" action="#">
-        <label>Nombre completo</label>
-        <input type="text" name="nombre" placeholder="Ej: Nombre Apellido" required>
+          {% if sent_ok %}
+            <div class="alert alert-success">
+              Tu mensaje fue enviado correctamente. Te contactaremos pronto.
+            </div>
+          {% endif %}
 
-        <label>Correo electrónico</label>
-        <input type="email" name="correo" placeholder="Ej: ejemplo@empresa.cl" required>
+          {% if errors %}
+            <div class="alert alert-error">
+              <ul>
+                {% for e in errors %}
+                  <li>{{ e }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
 
-        <label>Asunto</label>
-        <input type="text" name="asunto" placeholder="Motivo del contacto" required>
+          <label>Nombre completo</label>
+          <input type="text" name="nombre" placeholder="Ej: Nombre Apellido"
+                value="{{ form_data.nombre if form_data else '' }}" required>
 
-        <label>Mensaje</label>
-        <textarea name="mensaje" rows="5" placeholder="Describe tu solicitud o problema..." required></textarea>
+          <label>Correo electrónico</label>
+          <input type="email" name="correo" placeholder="Ej: ejemplo@empresa.cl"
+                value="{{ form_data.correo if form_data else '' }}" required>
 
-        <button type="submit" class="btn msg_primary">Enviar mensaje</button>
-      </form>
+          <label>Asunto</label>
+          <input type="text" name="asunto" placeholder="Motivo del contacto"
+                value="{{ form_data.asunto if form_data else '' }}" required>
+
+          <label>Mensaje</label>
+          <textarea name="mensaje" rows="5" placeholder="Describe tu solicitud o problema..." required>{{ form_data.mensaje if form_data else '' }}</textarea>
+
+          <button type="submit" class="btn msg_primary">Enviar mensaje</button>
+        </form>
     </div>
 
     <div>
