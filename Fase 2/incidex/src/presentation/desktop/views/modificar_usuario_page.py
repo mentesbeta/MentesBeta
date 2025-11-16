@@ -9,6 +9,12 @@ from PySide6.QtGui import QPixmap
 from core.resources import asset_path
 from core.db_manager import DBManager
 
+import re
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from datetime import datetime, date
+
 
 class ModificarUsuarioPage(QWidget):
     def __init__(self, volver_callback=None, parent=None):
@@ -120,14 +126,12 @@ class ModificarUsuarioPage(QWidget):
         col_left = QVBoxLayout()
         col_left.setSpacing(4)
         self.name_edit = QLineEdit()
-        self.name_edit.setPlaceholderText("Nombre")
         col_left.addWidget(QLabel("Nombre:"))
         col_left.addWidget(self.name_edit)
 
         col_right = QVBoxLayout()
         col_right.setSpacing(4)
         self.last_edit = QLineEdit()
-        self.last_edit.setPlaceholderText("Apellido")
         col_right.addWidget(QLabel("Apellido:"))
         col_right.addWidget(self.last_edit)
 
@@ -139,12 +143,10 @@ class ModificarUsuarioPage(QWidget):
         self.birth = QDateEdit()
         self.birth.setDisplayFormat("dd/MM/yyyy")
         self.birth.setCalendarPopup(True)
-        self.birth.setDate(QDate.currentDate())
         add_field("Fecha Nacimiento:", self.birth)
 
         # === Correo ===
         self.email = QLineEdit()
-        self.email.setPlaceholderText("Correo")
         add_field("Correo:", self.email)
 
         # === Género ===
@@ -197,96 +199,122 @@ class ModificarUsuarioPage(QWidget):
 
         # === Logo ===
         logo_label = QLabel()
-        logo_pix = QPixmap(asset_path("logo.png")).scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        logo_pix = QPixmap(asset_path("logo.png")).scaled(80, 80)
         logo_label.setPixmap(logo_pix)
         logo_label.setAlignment(Qt.AlignRight | Qt.AlignBottom)
-        right_side = QVBoxLayout()
-        right_side.addStretch(1)
-        right_side.addWidget(logo_label, alignment=Qt.AlignRight | Qt.AlignBottom)
 
-        main_layout.addStretch(1)
-        main_layout.addWidget(frame, alignment=Qt.AlignVCenter)
+        right_side = QVBoxLayout()
+        right_side.addStretch()
+        right_side.addWidget(logo_label)
+
+        main_layout.addStretch()
+        main_layout.addWidget(frame)
         main_layout.addLayout(right_side)
-        main_layout.addStretch(1)
+        main_layout.addStretch()
 
     # ------------------------------------------------------------------
     def cargar_roles(self):
         try:
             roles = DBManager.obtener_roles() or []
-        except Exception as e:
-            print("❌ Error al obtener roles:", e)
+        except:
             roles = []
-
         self.role.clear()
         if not roles:
             self.role.addItem("No hay roles disponibles")
             return
-
         for r in roles:
-            rid, rname = (r[0], r[1]) if isinstance(r, (list, tuple)) else (r["id"], r["name"])
-            self.role.addItem(str(rname), rid)
+            self.role.addItem(r["name"], r["id"])
 
     def cargar_departamentos(self):
         try:
             deps = DBManager.obtener_departamentos() or []
-        except Exception as e:
-            print("❌ Error al obtener departamentos:", e)
+        except:
             deps = []
-
         self.department.clear()
         if not deps:
             self.department.addItem("No hay departamentos disponibles")
             return
-
         for d in deps:
-            did, dname = (d[0], d[1]) if isinstance(d, (list, tuple)) else (d["id"], d["name"])
-            self.department.addItem(str(dname), did)
+            self.department.addItem(d["name"], d["id"])
 
     # ------------------------------------------------------------------
     def cargar_datos_usuario(self, data):
         """Carga los datos de un usuario para modificarlos."""
-        self.usuario_id = data["id"]
-        self.name_edit.setText(data["nombre"])
-        self.last_edit.setText(data["apellido"])
-        self.email.setText(data["correo"])
+        if not data:
+            QMessageBox.warning(self, "Error", "No se pudo cargar la información del usuario.")
+            return
 
+        # ID
+        self.usuario_id = data.get("id")
+
+        # Nombre, apellido, correo
+        self.name_edit.setText(data.get("nombre", ""))
+        self.last_edit.setText(data.get("apellido", ""))
+        self.email.setText(data.get("correo", ""))
+
+        # Fecha de nacimiento (puede venir como string o como date/datetime)
         try:
-            fecha = QDate.fromString(data["fecha_nacimiento"], "yyyy-MM-dd")
-            if fecha.isValid():
-                self.birth.setDate(fecha)
-        except Exception:
-            pass
+            fecha_raw = data.get("fecha_nacimiento")
+            fecha_qt = QDate()
 
+            if isinstance(fecha_raw, str):
+                # Asumimos formato yyyy-MM-dd desde la BD
+                fecha_qt = QDate.fromString(fecha_raw, "yyyy-MM-dd")
+            elif isinstance(fecha_raw, (date, datetime)):
+                fecha_qt = QDate(fecha_raw.year, fecha_raw.month, fecha_raw.day)
+
+            if fecha_qt.isValid():
+                self.birth.setDate(fecha_qt)
+        except Exception as e:
+            print("⚠ Error al interpretar fecha_nacimiento:", e)
+
+        # Género
         genero_map = {"M": "Masculino", "F": "Femenino", "X": "Otro"}
-        idx = self.gender.findText(genero_map.get(data.get("genero"), ""), Qt.MatchFixedString)
-        if idx >= 0:
-            self.gender.setCurrentIndex(idx)
+        genero_codigo = data.get("genero")
+        genero_texto = genero_map.get(genero_codigo, "")
+        if genero_texto:
+            idx_gen = self.gender.findText(genero_texto, Qt.MatchFixedString)
+            if idx_gen >= 0:
+                self.gender.setCurrentIndex(idx_gen)
 
-        rol_idx = self.role.findData(data.get("rol_id"))
-        if rol_idx >= 0:
-            self.role.setCurrentIndex(rol_idx)
+        # --- Rol: aceptar tanto 'rol_id' como 'role_id' ---
+        rol_id = data.get("rol_id")
+        if rol_id is None:
+            rol_id = data.get("role_id")  # por si la columna viene sin alias
 
-        dept_idx = self.department.findData(data.get("departamento_id"))
-        if dept_idx >= 0:
-            self.department.setCurrentIndex(dept_idx)
+        if rol_id is not None:
+            idx_rol = self.role.findData(rol_id)
+            if idx_rol >= 0:
+                self.role.setCurrentIndex(idx_rol)
+        else:
+            print("⚠ data sin 'rol_id' ni 'role_id':", data)
+
+        # --- Departamento: aceptar 'departamento_id' o 'department_id' ---
+        dept_id = data.get("departamento_id")
+        if dept_id is None:
+            dept_id = data.get("department_id")
+
+        if dept_id is not None:
+            idx_dep = self.department.findData(dept_id)
+            if idx_dep >= 0:
+                self.department.setCurrentIndex(idx_dep)
 
     # ------------------------------------------------------------------
     def modificar_usuario(self):
-        """Actualiza el usuario después de confirmar."""
         if not self.usuario_id:
             QMessageBox.warning(self, "Error", "No se ha cargado ningún usuario.")
             return
 
+        # === Confirmación ===
         confirm = QMessageBox.question(
-            self,
-            "Confirmar modificación",
+            self, "Confirmar modificación",
             "¿Deseas guardar los cambios de este usuario?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.Yes | QMessageBox.No
         )
         if confirm != QMessageBox.Yes:
             return
 
+        # === Capturar datos ===
         data = {
             "nombre": self.name_edit.text().strip(),
             "apellido": self.last_edit.text().strip(),
@@ -298,38 +326,126 @@ class ModificarUsuarioPage(QWidget):
             "password": self.pwd.text().strip() if self.pwd.text().strip() else None
         }
 
-        if data["password"] and self.pwd.text() != self.pwd2.text():
-            QMessageBox.warning(self, "Error", "Las contraseñas no coinciden.")
+        # ============================================
+        # VALIDACIONES (igual que en CREAR USUARIO)
+        # ============================================
+
+        # Edad
+        try:
+            fn = datetime.strptime(data["fecha_nacimiento"], "%Y-%m-%d").date()
+            hoy = date.today()
+            edad = hoy.year - fn.year - ((hoy.month, hoy.day) < (fn.month, fn.day))
+            if edad < 18 or edad > 100:
+                QMessageBox.warning(self, "Edad inválida", "La edad debe ser entre 18 y 100 años.")
+                return
+        except:
+            QMessageBox.warning(self, "Fecha inválida", "La fecha de nacimiento no es válida.")
             return
 
+        # Correo
+        patron_correo = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+        if not re.match(patron_correo, data["correo"]):
+            QMessageBox.warning(self, "Correo inválido", "El correo ingresado no es válido.")
+            return
+
+        # Contraseña
+        if data["password"]:
+            patron_password = (
+                r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)'
+                r'(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$'
+            )
+            if not re.match(patron_password, data["password"]):
+                QMessageBox.warning(
+                    self, "Contraseña insegura",
+                    "La contraseña debe tener:\n"
+                    "- 1 mayúscula\n"
+                    "- 1 minúscula\n"
+                    "- 1 número\n"
+                    "- 1 símbolo especial\n"
+                    "- mínimo 8 caracteres"
+                )
+                return
+
+            if self.pwd.text() != self.pwd2.text():
+                QMessageBox.warning(self, "Error", "Las contraseñas no coinciden.")
+                return
+
+        # ============================================
+        # ACTUALIZAR USUARIO
+        # ============================================
         ok = DBManager.actualizar_usuario(self.usuario_id, data)
+
         if ok:
             QMessageBox.information(self, "Éxito", "Usuario actualizado correctamente.")
 
-            # === Registrar acción en bitácora ===
+            # Enviar correo
+            self.enviar_correo_notificacion(
+                correo=data["correo"],
+                nombre=data["nombre"],
+                apellido=data["apellido"],
+                nueva_contraseña=data["password"]
+            )
+
+            # Bitácora
             usuario_log = DBManager.get_user()
             if usuario_log:
                 DBManager.insertar_bitacora(
                     usuario=usuario_log["nombre"],
                     rol=usuario_log["rol"],
                     accion="Modificación de usuario",
-                    resultado=f"Usuario ID {self.usuario_id} ({data['nombre']} {data['apellido']}) modificado correctamente."
+                    resultado=f"Usuario {data['nombre']} modificado correctamente."
                 )
 
+            # Volver
             if callable(self.volver_callback):
-                # compatibilidad: el callback puede o no aceptar argumentos
                 try:
                     self.volver_callback(True)
-                except TypeError:
+                except:
                     self.volver_callback()
 
     # ------------------------------------------------------------------
+    def enviar_correo_notificacion(self, correo, nombre, apellido, nueva_contraseña=None):
+        remitente = "incidexadmescritorio@gmail.com"
+        app_password = "ivybgbsursbgdqyd"
+        asunto = "Actualización de tu cuenta - Incidex"
+
+        mensaje = f"""
+        <html><body>
+        <h3 style="color:#1E73FA;">Hola {nombre} {apellido},</h3>
+        <p>Tu cuenta ha sido modificada correctamente.</p>
+        """
+
+        if nueva_contraseña:
+            mensaje += f"<p><b>Nueva contraseña:</b> {nueva_contraseña}</p>"
+
+        mensaje += """
+        <p></p>
+        <hr>
+        <p style="font-size:12px;color:#777;">Mensaje automático, por favor no responder.</p>
+        </body></html>
+        """
+
+        try:
+            msg = MIMEMultipart()
+            msg["From"] = remitente
+            msg["To"] = correo
+            msg["Subject"] = asunto
+            msg.attach(MIMEText(mensaje, "html"))
+
+            s = smtplib.SMTP("smtp.gmail.com", 587)
+            s.starttls()
+            s.login(remitente, app_password)
+            s.send_message(msg)
+            s.quit()
+
+            print(f"📨 Correo enviado a {correo}")
+        except Exception as e:
+            print("❌ Error al enviar correo:", e)
+
+    # ------------------------------------------------------------------
     def cancelar(self):
-        """Vuelve al listado sin guardar cambios."""
         if callable(self.volver_callback):
             try:
                 self.volver_callback(False)
-            except TypeError:
+            except:
                 self.volver_callback()
-
-

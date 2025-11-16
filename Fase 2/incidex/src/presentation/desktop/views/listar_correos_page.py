@@ -121,8 +121,8 @@ class ListarCorreosPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.db = DBManager()
-        self.usuario = "pororeal1@gmail.com"
-        self.contraseña = "tdpfjqeyfpnbovxv"
+        self.usuario = "incidexadmescritorio@gmail.com"
+        self.contraseña = "ivybgbsursbgdqyd"
         self._correos_cargados = False
         self.worker = None
         self.loading_window = None

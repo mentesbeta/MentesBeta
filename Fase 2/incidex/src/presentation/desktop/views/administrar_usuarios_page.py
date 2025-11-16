@@ -8,8 +8,10 @@ from PySide6.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QFrame,
     QTableWidget, QTableWidgetItem, QPushButton, QLineEdit, QMessageBox
 )
+from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QApplication, QMessageBox
 from core.resources import asset_path
 from core.db_manager import DBManager  # conexión real a la DB
 import math
@@ -259,18 +261,24 @@ class AdministrarUsuariosPage(QWidget):
     #   Abrir vista de modificación
     # ---------------------------------------------------------
     def abrir_modificar_usuario(self, user_tuple):
-        """Solicita al MainWindow abrir la vista de modificación."""
-        from PySide6.QtWidgets import QApplication
+        """Abre la página de modificar usuario usando datos completos del usuario."""
+        
         user_id = int(user_tuple[0])
+
+        # Obtener TODOS los datos reales del usuario desde la DB
         data = DBManager.obtener_usuario_por_id(user_id)
+
         if not data:
-            QMessageBox.warning(self, "Error", f"No se encontró información para el usuario ID {user_id}.")
+            QMessageBox.warning(self, "Error", "No se pudo cargar la información del usuario.")
             return
 
         window = QApplication.activeWindow()
+
+        # Cargar los datos completos en la vista de modificación
         if hasattr(window, "modificar_usuario_page"):
             window.modificar_usuario_page.cargar_datos_usuario(data)
             window.stack.setCurrentWidget(window.modificar_usuario_page)
+
 
     def _volver_a_listado(self, refrescar=False):
         """Vuelve al listado y actualiza si es necesario."""

@@ -283,13 +283,8 @@ class MainWindow(QMainWindow):
         for col in range(5):  # ID, Nombre, Apellido, Correo, Rol
             item = self.admin_user_page.table.item(row, col)
             datos.append(item.text() if item else "")
-        self.modificar_usuario_page.cargar_datos_usuario({
-            "id": int(datos[0]),
-            "nombre": datos[1],
-            "apellido": datos[2],
-            "correo": datos[3],
-            "rol": datos[4]
-        })
+        data = DBManager.obtener_usuario_por_id(int(datos[0]))
+        self.modificar_usuario_page.cargar_datos_usuario(data)
         self.stack.setCurrentWidget(self.modificar_usuario_page)
 
     # ---------------------------------------------------------

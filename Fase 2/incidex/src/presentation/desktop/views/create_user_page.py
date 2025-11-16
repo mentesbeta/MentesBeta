@@ -60,10 +60,46 @@ class CreateUserPage(QWidget):
                 padding: 4px 8px;
                 font-size: 11px;
                 background-color: #ffffff;
-                color: #000000;
+                color: #000000;        /* 🔹 texto negro dentro del input */
                 min-height: 24px;
                 height: 24px;
                 font-weight: normal;
+            }
+
+            /* 🔹 Menús desplegables de QComboBox (lista interna) */
+            QComboBox QAbstractItemView {
+                background-color: #ffffff;
+                color: #000000;
+                selection-background-color: #1E73FA;
+                selection-color: #ffffff;
+            }
+
+            /* 🔹 Botón desplegable del QComboBox */
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left: 1px solid #999;
+                background: #f0f0f0;
+            }
+
+            /* 🔹 Calendario del QDateEdit */
+            QCalendarWidget QToolButton {
+                color: #000000;
+                background-color: #ffffff;
+                font-weight: normal;
+            }
+
+            QCalendarWidget QWidget {
+                color: #000000;
+                background-color: #ffffff;
+                font-weight: normal;
+            }
+
+            QCalendarWidget QAbstractItemView:enabled {
+                color: #000000;
+                selection-background-color: #1E73FA;
+                selection-color: #ffffff;
             }
 
             QPushButton {
@@ -341,8 +377,8 @@ class CreateUserPage(QWidget):
     # ------------------------------------------------------------------
     def enviar_correo_credenciales(self, correo_destino, nombre, correo_usuario, contraseña):
         """Envía un correo con las credenciales de acceso al nuevo usuario."""
-        remitente = "pororeal1@gmail.com"
-        app_password = "tdpfjqeyfpnbovxv"
+        remitente = "incidexadmescritorio@gmail.com"
+        app_password = "ivybgbsursbgdqyd"
         asunto = "Cuenta creada - Plataforma Incidex"
 
         mensaje_html = f"""
