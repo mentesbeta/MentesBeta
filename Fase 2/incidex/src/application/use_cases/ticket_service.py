@@ -78,6 +78,7 @@ class TicketService:
 
 
     # ======= Crear ticket =======
+        # ======= Crear ticket =======
     def create(self, *, requester_id: int, subject: str, details: str,
                category_id: int, department_id: int, priority_id: int, assignee_id: int | None):
         code = self.repo.next_ticket_code()
@@ -91,6 +92,32 @@ class TicketService:
             priority_id=priority_id,
             assignee_id=assignee_id
         )
+
+        # === Notificación al solicitante ===
+        try:
+            msg_req = f"Tu ticket {code} ha sido creado exitosamente."
+            self.repo.insert_notification(
+                user_id=int(requester_id),
+                ticket_id=created.id,
+                kind="CREATED",
+                message=msg_req
+            )
+        except Exception as e:
+            print(f"[WARN] No se pudo notificar al solicitante: {e}")
+
+        # === Notificación al analista asignado (si existe) ===
+        if assignee_id:
+            try:
+                msg_ass = f"Se te ha asignado automáticamente el ticket {code}."
+                self.repo.insert_notification(
+                    user_id=int(assignee_id),
+                    ticket_id=created.id,
+                    kind="ASSIGNED",
+                    message=msg_ass
+                )
+            except Exception as e:
+                print(f"[WARN] No se pudo notificar al analista: {e}")
+
         return created
     
     def dashboard_data(self, user_id: int, limit: int = 10):
@@ -284,94 +311,110 @@ class TicketService:
         actor_roles: list[str],
         to_status_id: int,
         note: str | None = None
-        ):
-            tmin = self.repo.get_ticket_minimal(ticket_id)
-            if not tmin:
-                raise ValueError("Ticket no existe")
+    ):
+        tmin = self.repo.get_ticket_minimal(ticket_id)
+        if not tmin:
+            raise ValueError("Ticket no existe")
 
-            roles_up = {(r or "").upper() for r in (actor_roles or [])}
-            is_admin    = "ADMIN" in roles_up
-            is_analyst  = "ANALYST" in roles_up
-            is_request  = "REQUESTER" in roles_up
+        roles_up   = {(r or "").upper() for r in (actor_roles or [])}
+        is_admin   = "ADMIN" in roles_up
+        is_analyst = "ANALYST" in roles_up
+        is_request = "REQUESTER" in roles_up
 
+        requester_id = tmin.get("requester_id")
+        assignee_id  = tmin.get("assignee_id")
+        status_id    = tmin.get("status_id")
+
+        is_assignee       = (assignee_id == actor_id)
+        is_ticket_creator = (requester_id == actor_id)
+
+        # nombre del nuevo estado
+        target_name = (self.repo.get_status_name(int(to_status_id)) or "").upper()
+
+        # --- Validación normal de permisos ---
+        def can_change_to(target: str) -> bool:
+            t = (target or "").upper()
+
+            if is_admin:
+                return True
+
+            # Analista puede pasar por todo el flujo técnico
+            if is_analyst:
+                return t in {"EN_PROGRESO", "ASIGNADO", "RECHAZADO", "CERRADO"}
+
+            # Requester puede marcar resuelto si lo creó
+            if is_request and t == "RESUELTO":
+                return True
+
+            # Cualquier asignado puede avanzar a EN_PROGRESO
+            if is_assignee and t == "EN_PROGRESO":
+                return True
+
+            return False
+
+        if not can_change_to(target_name):
+            raise PermissionError("No tienes permiso para cambiar a este estado")
+
+        # --- Actualizamos el estado ---
+        self.repo.update_status_with_history(
+            ticket_id=ticket_id,
+            to_status_id=int(to_status_id),
+            actor_user_id=actor_id,
+            note=note,
+        )
+
+        # --- Si pasa a RESUELTO por el requester: autoasignar a analista menos cargado ---
+        if target_name == "RESUELTO":
+            dept_id = tmin.get("department_id")
+            if dept_id:
+                analyst = self.repo.get_least_busy_analyst_by_department(dept_id)
+                if analyst:
+                    # reasignar con historial
+                    self.repo.update_assignee_with_history(
+                        ticket_id=ticket_id,
+                        new_assignee_id=analyst["id"],
+                        actor_user_id=actor_id,
+                        note="Autoasignado al analista para revisión y cierre (flujo automático)",
+                    )
+
+                    # Notificación al analista que recibe el ticket resuelto
+                    try:
+                        code = tmin.get("code")
+                        msg_ass = f"Se te ha asignado el ticket {code} para revisar y cerrar (marcado como RESUELTO por el solicitante)."
+                        self.repo.insert_notification(
+                            user_id=int(analyst["id"]),
+                            ticket_id=ticket_id,
+                            kind="ASSIGNED_REVIEW",
+                            message=msg_ass,
+                        )
+                    except Exception as e:
+                        print(f"[WARN] No se pudo notificar al analista autoasignado: {e}")
+
+        # --- Notificación para el solicitante cuando se RESUELVE o se CIERRA ---
+        tmin = self.repo.get_ticket_minimal(ticket_id)
+        if tmin:
             requester_id = tmin.get("requester_id")
-            assignee_id  = tmin.get("assignee_id")
-            status_id    = tmin.get("status_id")
-
-            is_assignee       = (assignee_id == actor_id)
-            is_ticket_creator = (requester_id == actor_id)
-
-            # nombre del nuevo estado
+            code = tmin.get("code")
             target_name = (self.repo.get_status_name(int(to_status_id)) or "").upper()
 
-            # --- Validación normal de permisos ---
-            def can_change_to(target: str) -> bool:
-                t = (target or "").upper()
+            if requester_id and target_name in {"RESUELTO", "CERRADO"}:
+                if target_name == "RESUELTO":
+                    msg = f"Tu ticket {code} ha sido marcado como RESUELTO."
+                    kind = "RESOLVED"
+                else:
+                    msg = f"Tu ticket {code} ha sido CERRADO."
+                    kind = "CLOSED"
 
-                if is_admin:
-                    return True
-
-                # Analista puede pasar por todo el flujo técnico
-                if is_analyst:
-                    return t in {"EN_PROGRESO", "ASIGNADO", "RECHAZADO", "CERRADO"}
-
-                # Requester puede marcar resuelto si lo creó
-                if is_request and t == "RESUELTO":
-                    return True
-
-                # Cualquier asignado puede avanzar a EN_PROGRESO
-                if is_assignee and t == "EN_PROGRESO":
-                    return True
-
-                return False
-
-            if not can_change_to(target_name):
-                raise PermissionError("No tienes permiso para cambiar a este estado")
-
-            # --- Actualizamos el estado ---
-            self.repo.update_status_with_history(
-                ticket_id=ticket_id,
-                to_status_id=int(to_status_id),
-                actor_user_id=actor_id,
-                note=note,
-            )
-
-            # --- NUEVO: si pasa a RESUELTO por un requester ---
-            if target_name == "RESUELTO":
-                # buscamos depto del ticket
-                dept_id = self.repo.get_ticket_minimal(ticket_id).get("department_id")
-                if dept_id:
-                    # elegimos el analista con menor carga
-                    analyst = self.repo.get_least_busy_analyst_by_department(dept_id)
-                    if analyst:
-                        self.repo.update_assignee_with_history(
-                            ticket_id=ticket_id,
-                            new_assignee_id=analyst["id"],
-                            actor_user_id=actor_id,
-                            note="Autoasignado al analista para revisión y cierre (flujo automático)",
-                        )
-            
-            # Notificación para el solicitante cuando se RESUELVE o se CIERRA
-            tmin = self.repo.get_ticket_minimal(ticket_id)
-            if tmin:
-                requester_id = tmin.get("requester_id")
-                code = tmin.get("code")
-                target_name = (self.repo.get_status_name(int(to_status_id)) or "").upper()
-
-                if requester_id and target_name in {"RESUELTO", "CERRADO"}:
-                    if target_name == "RESUELTO":
-                        msg = f"Tu ticket {code} ha sido marcado como RESUELTO."
-                        kind = "RESOLVED"
-                    else:
-                        msg = f"Tu ticket {code} ha sido CERRADO."
-                        kind = "CLOSED"
-
+                try:
                     self.repo.insert_notification(
                         user_id=int(requester_id),
                         ticket_id=ticket_id,
                         kind=kind,
                         message=msg,
                     )
+                except Exception as e:
+                    print(f"[WARN] No se pudo notificar al solicitante: {e}")
+
 
 
     # ===== Reasignar =====

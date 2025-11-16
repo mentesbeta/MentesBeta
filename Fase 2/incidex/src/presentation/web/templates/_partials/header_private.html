@@ -6,8 +6,24 @@
            alt="Incidex" class="brand__logo">
     </a>
 
+    <!-- Toggle mobile -->
+    <button class="nav-toggle"
+            type="button"
+            id="privateNavToggle"
+            aria-label="Abrir menú de navegación"
+            aria-expanded="false"
+            aria-controls="privateNavMenu">
+      
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/>
+      </svg>
+      <span class="nav-toggle__text"> Menú</span>
+    </button>
+
     <!-- Menú centrado -->
-    <nav class="nav-items nav-items--center" aria-label="Navegación del panel">
+    <nav class="nav-items nav-items--center"
+         id="privateNavMenu"
+         aria-label="Navegación del panel">
       <a class="nav-link {{ 'is-active' if request.endpoint=='tickets.dashboard' else '' }}"
          href="{{ url_for('tickets.dashboard') }}">Inicio</a>
 
@@ -36,7 +52,9 @@
           <div class="notif-dropdown__header">
             <span>Notificaciones</span>
             {% if header_notifications_unread %}
-              <form method="post" action="{{ url_for('tickets.notifications_read_all') }}" class="notif-header-form">
+              <form method="post"
+                    action="{{ url_for('tickets.notifications_read_all') }}"
+                    class="notif-header-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="notif-link" type="submit">Marcar como leídas</button>
               </form>
@@ -96,7 +114,6 @@
   </div>
 </header>
 
-
 <script>
   (function () {
     // ===== Menú usuario =====
@@ -142,6 +159,41 @@
         if (!notifDrop.contains(e.target) && e.target !== notifBtn) {
           toggleNotif(false);
         }
+      });
+    }
+
+    // ===== Toggle menú principal (mobile) =====
+    const navToggle = document.getElementById('privateNavToggle');
+    const navMenu   = document.getElementById('privateNavMenu');
+
+    if (navToggle && navMenu) {
+      const toggleNav = () => {
+        const isOpen = navMenu.classList.toggle('is-open');
+        navToggle.setAttribute('aria-expanded', String(isOpen));
+      };
+
+      navToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleNav();
+      });
+
+      // Cerrar al hacer click fuera (solo mobile)
+      document.addEventListener('click', (e) => {
+        if (window.innerWidth > 768) return;
+        if (!navMenu.contains(e.target) && e.target !== navToggle) {
+          navMenu.classList.remove('is-open');
+          navToggle.setAttribute('aria-expanded', "false");
+        }
+      });
+
+      // Cerrar al hacer click en una opción del menú (mobile)
+      navMenu.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', () => {
+          if (window.innerWidth <= 768) {
+            navMenu.classList.remove('is-open');
+            navToggle.setAttribute('aria-expanded', "false");
+          }
+        });
       });
     }
   })();
