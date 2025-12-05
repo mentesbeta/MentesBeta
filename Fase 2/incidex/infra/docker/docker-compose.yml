@@ -1,21 +1,20 @@
-# docker-compose.yml
+# (sin 'version')
 
 services:
   mysql:
-    image: mysql:${MYSQL_VERSION:-8.0}
-    container_name: ${COMPOSE_PROJECT_NAME:-incidex}-mysql
+    image: mysql:${MYSQL_VERSION}
+    container_name: ${COMPOSE_PROJECT_NAME}-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-incidex_db}
-      MYSQL_USER: ${MYSQL_USER:-incidex}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-incidex}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       TZ: "UTC"
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - "${MYSQL_PORT}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      # Las migraciones se cargan automáticamente al inicio (solo lectura)
       - ../../db/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -p${MYSQL_ROOT_PASSWORD} --silent"]
@@ -27,7 +26,7 @@ services:
 
   adminer:
     image: adminer:latest
-    container_name: ${COMPOSE_PROJECT_NAME:-incidex}-adminer
+    container_name: ${COMPOSE_PROJECT_NAME}-adminer
     restart: unless-stopped
     depends_on:
       mysql:
@@ -35,7 +34,7 @@ services:
     environment:
       ADMINER_DEFAULT_SERVER: mysql
     ports:
-      - "${ADMINER_PORT:-8080}:8080"
+      - "${ADMINER_PORT}:8080"
     networks:
       - incidex_net
 
