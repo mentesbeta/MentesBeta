@@ -169,7 +169,7 @@ class LoginDialog(QDialog):
     def _on_login(self):
         email = self.ui.line_user.text().strip()
         pwd = self.ui.line_pass.text().strip()
-
+ 
         if not email or not pwd:
             self._msg("Campos vacíos", "Por favor ingrese correo y contraseña.", QMessageBox.Warning)
             return

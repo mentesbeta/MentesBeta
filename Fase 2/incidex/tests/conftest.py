@@ -73,3 +73,19 @@ def auth_client(app, test_user):
 @pytest.fixture
 def client(app):
     return app.test_client()
+
+@pytest.fixture
+def db_conn(app):
+    """
+    Entrega una conexión cruda a la BD (DB-API) usando el engine de SQLAlchemy.
+    Se hace rollback al final del test para no dejar datos sucios.
+    """
+    with app.app_context():
+        conn = db.engine.raw_connection()  # conexión real al MySQL de Docker
+        conn.autocommit = False
+
+        try:
+            yield conn
+            conn.rollback()  # revertimos todo lo hecho en el test
+        finally:
+            conn.close()
