@@ -16,7 +16,7 @@ def test_about_ok(client):
     resp = client.get("/sobre")
     assert resp.status_code == 200
     # Título o texto reconocible en public/about.html
-    assert "Sobre Incidex".encode("utf-8") in resp.data
+    assert "Sobre Incidex".encode("utf-8") in resp.data 
 
 #Test para probar la ruta publica /support
 def test_support_get_ok(client):
