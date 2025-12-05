@@ -8,7 +8,7 @@ import bcrypt
 import imaplib
 import email
 from email.header import decode_header
-
+from werkzeug.security import generate_password_hash, check_password_hash
 class DBManager:
     # -----------------------------------------------------------
     # ROLES
@@ -633,17 +633,22 @@ class DBManager:
 
     @staticmethod
     def hash_password(password: str) -> str:
-        """Genera un hash seguro de la contraseña usando bcrypt."""
-        salt = bcrypt.gensalt()
-        hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
-        return hashed.decode("utf-8")
+        """
+        Genera un hash compatible con la app web usando Werkzeug.
 
+        Se usa 'scrypt' porque es el método por defecto en Werkzeug 2.3+ y
+        coincide con hashes del tipo:
+        scrypt:32768:8:1$salto$hash
+        """
+        return generate_password_hash(password, method="scrypt")
 
     @staticmethod
     def check_password(password: str, hashed: str) -> bool:
-        """Verifica si la contraseña ingresada coincide con el hash almacenado."""
+        """
+        Verifica la contraseña usando el mismo esquema que la app web.
+        """
         try:
-            return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
+            return check_password_hash(hashed, password)
         except Exception:
             return False
         
