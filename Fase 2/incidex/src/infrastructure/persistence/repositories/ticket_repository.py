@@ -4,7 +4,9 @@ from sqlalchemy import text
 from src.infrastructure.persistence.database import db
 from src.domain.entities.ticket import Ticket, Status, TicketHistory
 from src.domain.entities.ticket_extras import TicketAttachment, TicketComment
+from src.infrastructure.notifications.support_mail import send_notification_email
 from werkzeug.utils import secure_filename
+from flask import current_app
 
 @dataclass
 class CreatedTicket:
@@ -659,17 +661,56 @@ class TicketRepository:
     
     # ===== Notificaciones =====
     def insert_notification(self, *, user_id: int, ticket_id: int,
-                            kind: str, message: str):
-        db.session.execute(text("""
-            INSERT INTO ticket_notifications (user_id, ticket_id, kind, message)
-            VALUES (:u, :t, :k, :m)
-        """), {
-            "u": int(user_id),
-            "t": int(ticket_id),
-            "k": kind,
-            "m": message[:255],
-        })
+                        kind: str, message: str):
+        """
+        Inserta una notificación en la tabla ticket_notifications
+        y, si es posible, envía un correo al usuario.
+        Si el envío de correo falla, NO rompe la app.
+        """
+        # 1) Insertar en la BD (igual que antes)
+        db.session.execute(
+            text("""
+                INSERT INTO ticket_notifications (user_id, ticket_id, kind, message)
+                VALUES (:u, :t, :k, :m)
+            """),
+            {
+                "u": int(user_id),
+                "t": int(ticket_id),
+                "k": kind,
+                "m": message[:255],
+            },
+        )
         db.session.commit()
+
+        # 2) Intentar enviar correo (best-effort, no crítico)
+        try:
+            # Traemos el correo del usuario desde la tabla users
+            result = db.session.execute(
+                text("SELECT email FROM users WHERE id = :uid"),
+                {"uid": int(user_id)},
+            )
+            row = result.first()
+            if not row:
+                return  # no hay correo, no enviamos nada
+
+            to_email = row[0]
+
+            # Título amigable según tipo de notificación
+            subject_map = {
+                "ASSIGNED": "Nuevo ticket asignado",
+                "RESOLVED": "Tu ticket ha sido resuelto",
+                "CLOSED":   "Tu ticket ha sido cerrado",
+            }
+            title = subject_map.get(kind, "Notificación de Incidex")
+
+            # Usamos el helper que ya tienes en support_mail.py
+            send_notification_email(to_email, title, message)
+
+        except Exception as e:
+            # Importante: NO romper nada si falla el correo
+            current_app.logger.warning(f"[Email Notification Error] {e}")
+
+
 
     def list_unread_notifications(self, user_id: int, limit: int = 10):
         return db.session.execute(text("""
